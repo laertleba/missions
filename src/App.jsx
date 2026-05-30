@@ -35,7 +35,7 @@ function Planner({ session }) {
     catch { return [] }
   })
   const [syncSt, setSyncSt] = useState('syncing')
-  const [view, setView] = useState('week')
+  const [view, setView] = useState('missions')
   const [weekOff, setWeekOff] = useState(0)
   // Default dayOffset so today is in the visible 4-day window
   const [dayOffset, setDayOffset] = useState(() => {
@@ -461,7 +461,7 @@ function Planner({ session }) {
   // ── Nav tabs ──
   const navTabs = (
     <div style={{ display: 'flex', gap: '4px', backgroundColor: T.bgSurfaceAlt, borderRadius: '4px', padding: '3px', order: mob ? -1 : 0, alignSelf: mob ? 'stretch' : 'auto', border: '1px solid ' + T.borderSubtle }}>
-      {[['week', 'Weekly'], ['missions', 'Missions'], ['quests', 'Quests']].map(([v, label]) => {
+      {[['missions', 'Missions'], ['quests', 'Quests'], ['week', 'Weekly']].map(([v, label]) => {
         const active = view === v
         return (
           <button key={v} onClick={() => setView(v)} style={{

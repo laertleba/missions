@@ -7,9 +7,9 @@ import DayColumn from './components/DayColumn'
 import MissionsView from './components/MissionsView'
 import QuestsView from './components/QuestsView'
 import ImportModal from './components/ImportModal'
+import MissionEditModal from './components/MissionEditModal'
 
 const CACHE_KEY = 'missions_items_cache'
-const WEEKLY_QUEST_KEY = 'missions_weekly_quest'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -35,21 +35,23 @@ function Planner({ session }) {
     catch { return [] }
   })
   const [syncSt, setSyncSt] = useState('syncing')
-  const [view, setView] = useState('week') // 'week' | 'missions' | 'quests'
+  const [view, setView] = useState('week')
   const [weekOff, setWeekOff] = useState(0)
-  const [dayOffset, setDayOffset] = useState(0)
+  // Default dayOffset so today is in the visible 4-day window
+  const [dayOffset, setDayOffset] = useState(() => {
+    const dow = new Date().getDay()
+    const idx = dow === 0 ? 6 : dow - 1 // Mon=0 … Sun=6
+    return Math.min(idx, 3)             // clamp to max offset (7-4)
+  })
   const [mob, setMob] = useState(window.innerWidth < 768)
   const [mobDay, setMobDay] = useState(() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1 })
-  const [inputVals, setInputVals] = useState({})
   const [dragItem, setDragItem] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
   const [expTask, setExpTask] = useState(null)
   const [impData, setImpData] = useState(null)
-
-  // Quest-related UI state
+  const [editingMission, setEditingMission] = useState(null) // mission object | null
   const [selectedQuestId, setSelectedQuestId] = useState(null)
   const [questFilter, setQuestFilter] = useState('active')
-  const [weeklyQuestId, setWeeklyQuestId] = useState(() => localStorage.getItem(WEEKLY_QUEST_KEY) || null)
 
   const touchRef = useRef(null)
   const fileRef = useRef(null)
@@ -65,7 +67,6 @@ function Planner({ session }) {
 
   // ── Cache ──
   useEffect(() => { localStorage.setItem(CACHE_KEY, JSON.stringify(items)) }, [items])
-  useEffect(() => { if (weeklyQuestId) localStorage.setItem(WEEKLY_QUEST_KEY, weeklyQuestId) }, [weeklyQuestId])
 
   // ── Load + realtime ──
   const loadItems = useCallback(async () => {
@@ -88,7 +89,6 @@ function Planner({ session }) {
   // ── Derivations ──
   const quests = useMemo(() => items.filter(i => i.type === 'quest'), [items])
   const activeQuests = useMemo(() => quests.filter(q => !q.archived), [quests])
-  const questTitleById = useMemo(() => Object.fromEntries(quests.map(q => [q.id, q.title])), [quests])
 
   const childrenByParent = useMemo(() => {
     const m = {}
@@ -108,24 +108,7 @@ function Planner({ session }) {
     return m
   }, [items])
 
-  const activeMissions = useMemo(() => {
-    return items
-      .filter(i => i.type === 'mission' && !i.completed)
-      .sort((a, b) => {
-        const ad = a.scheduledDate, bd = b.scheduledDate
-        if (ad && bd) { if (ad !== bd) return bd.localeCompare(ad) }
-        else if (ad && !bd) return -1
-        else if (!ad && bd) return 1
-        return a.createdAt < b.createdAt ? 1 : -1
-      })
-  }, [items])
-
-  // ── Default selections ──
-  useEffect(() => {
-    if (!weeklyQuestId && activeQuests.length) setWeeklyQuestId(activeQuests[0].id)
-    if (weeklyQuestId && !activeQuests.some(q => q.id === weeklyQuestId) && activeQuests.length) setWeeklyQuestId(activeQuests[0].id)
-  }, [activeQuests, weeklyQuestId])
-
+  // ── Default quest selection ──
   useEffect(() => {
     if (!selectedQuestId && quests.length) setSelectedQuestId((quests.find(q => !q.archived) || quests[0]).id)
   }, [quests, selectedQuestId])
@@ -142,6 +125,13 @@ function Planner({ session }) {
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d })
   }
   const weekDates = getWeekDates()
+
+  function goToToday() {
+    setWeekOff(0)
+    const dow = new Date().getDay()
+    const idx = dow === 0 ? 6 : dow - 1
+    setDayOffset(Math.min(idx, 3))
+  }
 
   function nextTime(ds, isToday) {
     let st = 540
@@ -163,7 +153,6 @@ function Planner({ session }) {
     return quests.length ? Math.max(...quests.map(q => q.sortOrder)) + 1000 : 0
   }
 
-  // ── Build a client mission object ──
   function mkMission({ id, title, questId, parentId, scheduledDate = null, startTime = null, endTime = null, sortOrder }) {
     return {
       id, type: 'mission', title, text: title, completed: false, archived: false,
@@ -197,7 +186,6 @@ function Planner({ session }) {
     }
     setItems(prev => [...prev, q])
     setSelectedQuestId(id)
-    if (!weeklyQuestId) setWeeklyQuestId(id)
     await runWrite(supabase.from('items').insert({ id, user_id: userId, type: 'quest', title, sort_order: q.sortOrder }))
   }
 
@@ -215,11 +203,21 @@ function Planner({ session }) {
     await runWrite(supabase.from('items').update({ completed: false, archived: false, completed_at: null }).eq('id', quest.id))
   }
 
+  async function renameItem(id, title) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, title, text: title } : it))
+    await runWrite(supabase.from('items').update({ title }).eq('id', id))
+  }
+
   // ── Mission CRUD ──
   async function addTopMission(quest, title) {
     const m = mkMission({ id: crypto.randomUUID(), title, questId: quest.id, parentId: quest.id, sortOrder: nextSiblingSort(quest.id) })
     setItems(prev => [...prev, m])
     await runWrite(supabase.from('items').insert(missionInsert(m)))
+  }
+
+  async function addTopMissionById(questId, title) {
+    const quest = quests.find(q => q.id === questId)
+    if (quest) await addTopMission(quest, title)
   }
 
   async function addSubMission(parent, title) {
@@ -228,21 +226,27 @@ function Planner({ session }) {
     await runWrite(supabase.from('items').insert(missionInsert(m)))
   }
 
-  async function addWeeklyMission(ds) {
-    const txt = inputVals[ds]
-    if (!txt?.trim() || !weeklyQuestId) return
-    const st = nextTime(ds, ds === todayStr)
-    const m = mkMission({
-      id: crypto.randomUUID(), title: txt.trim(),
-      questId: weeklyQuestId, parentId: weeklyQuestId,
-      scheduledDate: ds, startTime: st, endTime: st + 30, sortOrder: nextSortInDate(ds),
-    })
-    setItems(prev => [...prev, m])
-    setInputVals(prev => ({ ...prev, [ds]: '' }))
-    await runWrite(supabase.from('items').insert(missionInsert(m)))
+  // Edit all fields of a mission in one call
+  async function updateMission(id, { title, scheduledDate, startTime, duration }) {
+    const item = items.find(it => it.id === id)
+    if (!item) return
+    const newStart = startTime !== undefined ? startTime : item.startTime
+    const newDur = duration !== undefined ? Number(duration) : item.duration
+    const newEnd = newStart != null ? newStart + newDur : null
+    setItems(prev => prev.map(it => it.id !== id ? it : {
+      ...it,
+      title: title ?? it.title, text: title ?? it.title,
+      scheduledDate: scheduledDate !== undefined ? (scheduledDate || null) : it.scheduledDate,
+      startTime: newStart, endTime: newEnd, duration: newDur,
+    }))
+    await runWrite(supabase.from('items').update({
+      title: title ?? item.title,
+      scheduled_date: scheduledDate !== undefined ? (scheduledDate || null) : item.scheduledDate,
+      start_time: newStart ?? null,
+      end_time: newEnd,
+    }).eq('id', id))
   }
 
-  // toggle completion for any item (mission subtree-cascade; quest delegates)
   async function toggleComplete(item) {
     if (!item.completed) {
       if (item.type === 'quest') return completeQuest(item)
@@ -261,49 +265,39 @@ function Planner({ session }) {
   async function deleteItem(item) {
     const ids = new Set(collectSubtreeIds(items, item.id))
     setItems(prev => prev.filter(it => !ids.has(it.id)))
-    await runWrite(supabase.from('items').delete().eq('id', item.id)) // DB cascades children
+    await runWrite(supabase.from('items').delete().eq('id', item.id))
   }
 
+  // TaskCard legacy field handlers (ds param ignored for items model)
   async function updateText(_ds, id, text) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, title: text, text } : it))
     await runWrite(supabase.from('items').update({ title: text }).eq('id', id))
   }
-
   async function updateStart(_ds, id, timeStr) {
     const p = timeStr.split(':').map(Number)
     if (isNaN(p[0]) || isNaN(p[1])) return
     const ns = p[0] * 60 + p[1]
-    let endTime = ns + 30
-    setItems(prev => prev.map(it => {
-      if (it.id !== id) return it
-      endTime = ns + it.duration
-      return { ...it, startTime: ns, endTime }
-    }))
-    await runWrite(supabase.from('items').update({ start_time: ns, end_time: endTime }).eq('id', id))
+    let et = ns + 30
+    setItems(prev => prev.map(it => { if (it.id !== id) return it; et = ns + it.duration; return { ...it, startTime: ns, endTime: et } }))
+    await runWrite(supabase.from('items').update({ start_time: ns, end_time: et }).eq('id', id))
   }
-
   async function updateDuration(_ds, id, dur) {
-    let endTime = 0
-    setItems(prev => prev.map(it => {
-      if (it.id !== id) return it
-      endTime = it.startTime + dur
-      return { ...it, duration: dur, endTime }
-    }))
-    await runWrite(supabase.from('items').update({ end_time: endTime }).eq('id', id))
+    let et = 0
+    setItems(prev => prev.map(it => { if (it.id !== id) return it; et = it.startTime + dur; return { ...it, duration: dur, endTime: et } }))
+    await runWrite(supabase.from('items').update({ end_time: et }).eq('id', id))
   }
-
   async function moveTask(_ds, id, newDate) {
     const task = items.find(it => it.id === id)
     if (!task || task.scheduledDate === newDate) return
     const ns = nextTime(newDate, newDate === todayStr)
-    const endTime = ns + task.duration
+    const et = ns + task.duration
     const sort = nextSortInDate(newDate)
-    setItems(prev => prev.map(it => it.id === id ? { ...it, scheduledDate: newDate, startTime: ns, endTime, sortOrder: sort } : it))
+    setItems(prev => prev.map(it => it.id === id ? { ...it, scheduledDate: newDate, startTime: ns, endTime: et, sortOrder: sort } : it))
     setExpTask(null)
-    await runWrite(supabase.from('items').update({ scheduled_date: newDate, start_time: ns, end_time: endTime, sort_order: sort }).eq('id', id))
+    await runWrite(supabase.from('items').update({ scheduled_date: newDate, start_time: ns, end_time: et, sort_order: sort }).eq('id', id))
   }
 
-  // ── Weekly drag & drop ──
+  // ── Drag & drop ──
   function onDragStart(ds, task) { setDragItem({ dateString: ds, task }) }
   function onDragEnd() { setDragItem(null); setDragOverId(null) }
 
@@ -345,7 +339,7 @@ function Planner({ session }) {
     setSync(res.some(r => r.error) ? 'error' : 'synced')
   }
 
-  // ── Export / Import (v2) ──
+  // ── Export / Import ──
   function exportItems() {
     const rows = items.map(it => ({
       id: it.id, type: it.type, title: it.title, completed: it.completed, archived: it.archived,
@@ -379,24 +373,18 @@ function Planner({ session }) {
       const { error } = await supabase.from('items').delete().eq('user_id', userId)
       if (error) { setSync('error'); console.error(error); return }
     }
-    // Remap ids, then insert parents-before-children (depth order) for FK safety.
     const src = impData.items
     const idMap = new Map(src.map(it => [it.id, crypto.randomUUID()]))
     const byId = Object.fromEntries(src.map(it => [it.id, it]))
     const depthCache = {}
     const rows = src.map(it => ({
-      id: idMap.get(it.id),
-      user_id: userId,
-      type: it.type,
-      title: it.title || '',
-      completed: !!it.completed,
-      archived: !!it.archived,
+      id: idMap.get(it.id), user_id: userId, type: it.type, title: it.title || '',
+      completed: !!it.completed, archived: !!it.archived,
       completed_at: it.completed ? new Date().toISOString() : null,
       quest_id: it.quest_id ? idMap.get(it.quest_id) : null,
       parent_id: it.parent_id ? idMap.get(it.parent_id) : null,
       scheduled_date: it.scheduled_date ?? null,
-      start_time: it.start_time ?? null,
-      end_time: it.end_time ?? null,
+      start_time: it.start_time ?? null, end_time: it.end_time ?? null,
       sort_order: it.sort_order ?? 0,
       _depth: computeDepth(it, byId, depthCache),
     }))
@@ -435,6 +423,14 @@ function Planner({ session }) {
     setView('quests')
   }
 
+  // ── Shared mission handlers ──
+  const missionHandlers = {
+    onToggle: toggleComplete,
+    onDelete: deleteItem,
+    onAddSub: addSubMission,
+    onEdit: setEditingMission,
+  }
+
   // ── Sync indicator ──
   const syncDot = { synced: T.accent, syncing: T.amber, error: '#ff5a5a' }[syncSt] || T.textMuted
   const syncLbl = { synced: 'Synced', syncing: 'Syncing…', error: 'Sync error' }[syncSt] || ''
@@ -442,15 +438,13 @@ function Planner({ session }) {
   // ── Shared DayColumn props ──
   const dcp = {
     expandedTask: expTask, dragOverTaskId: dragOverId, draggedItem: dragItem, isMobile: mob,
-    quests: activeQuests, selectedQuestId: weeklyQuestId, onSelectQuest: setWeeklyQuestId,
-    onInput: (ds, v) => setInputVals(prev => ({ ...prev, [ds]: v })),
-    onAdd: addWeeklyMission, onExpand: setExpTask, onToggle: toggleComplete, onDelete: (_ds, id) => deleteItem(items.find(i => i.id === id)),
+    onExpand: setExpTask,
+    onToggle: (_ds, id) => toggleComplete(items.find(i => i.id === id)),
+    onDelete: (_ds, id) => deleteItem(items.find(i => i.id === id)),
     onUpdateText: updateText, onUpdateStart: updateStart, onUpdateDur: updateDuration, onMove: moveTask,
     onDragStart, onDragEnd, onSetDragOver: setDragOverId,
     onDropOnDay: ds => handleDrop(ds), onDropOnTask: (ds, tid) => handleDrop(ds, tid),
   }
-  // Weekly toggle/delete receive (ds,id); wrap to item-based handlers
-  dcp.onToggle = (_ds, id) => toggleComplete(items.find(i => i.id === id))
 
   const bBase = { backgroundColor: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: T.rSm, color: T.textSecondary, cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono }
   const bPad = mob ? '8px 12px' : '8px 16px'
@@ -465,10 +459,10 @@ function Planner({ session }) {
             flex: mob ? 1 : undefined,
             backgroundColor: active ? T.accentGlow : 'transparent',
             border: '1px solid ' + (active ? T.accentMuted : 'transparent'),
-            borderRadius: '3px', padding: '6px 16px',
+            borderRadius: '3px', padding: mob ? '6px 10px' : '6px 16px',
             color: active ? T.accent : T.textSecondary,
             textShadow: active ? T.textGlow : 'none',
-            cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono,
+            cursor: 'pointer', fontSize: mob ? '11px' : '12px', fontFamily: T.fontMono,
             letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap',
           }}>
             {label}
@@ -481,13 +475,16 @@ function Planner({ session }) {
   const weekNav = view === 'week' ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, justifyContent: 'center' }}>
       <button onClick={() => setWeekOff(w => w - 1)} style={{ ...bBase, padding: bPad }}>←</button>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: mob ? '160px' : '220px' }}>
-        <span style={{ fontSize: mob ? '14px' : '16px', fontWeight: '600', color: T.textPrimary, fontFamily: T.fontMono, letterSpacing: '0.04em', textAlign: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: mob ? '140px' : '220px' }}>
+        <span style={{ fontSize: mob ? '12px' : '16px', fontWeight: '600', color: T.textPrimary, fontFamily: T.fontMono, letterSpacing: '0.04em', textAlign: 'center' }}>
           {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' – '}{weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
-        {weekOff === 0 && <span style={{ fontSize: '10px', color: T.accent, fontWeight: '600', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.12em', textShadow: T.textGlow }}>Current Week</span>}
+        {weekOff === 0 && <span style={{ fontSize: '9px', color: T.accent, fontWeight: '600', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.12em', textShadow: T.textGlow }}>Current Week</span>}
       </div>
-      <button onClick={() => setWeekOff(0)} style={{ ...bBase, padding: bPad, backgroundColor: weekOff === 0 ? T.accentGlow : 'transparent', border: '1px solid ' + (weekOff === 0 ? T.accentMuted : T.borderSubtle), color: weekOff === 0 ? T.accent : T.textSecondary }}>Today</button>
+      <button
+        onClick={goToToday}
+        style={{ ...bBase, padding: bPad, backgroundColor: weekOff === 0 ? T.accentGlow : 'transparent', border: '1px solid ' + (weekOff === 0 ? T.accentMuted : T.borderSubtle), color: weekOff === 0 ? T.accent : T.textSecondary }}
+      >Today</button>
       <button onClick={() => setWeekOff(w => w + 1)} style={{ ...bBase, padding: bPad }}>→</button>
     </div>
   ) : <div style={{ flex: 1 }} />
@@ -507,9 +504,9 @@ function Planner({ session }) {
 
   // ── Render ──
   return (
-    <div style={{ backgroundColor: T.bgDeep, color: T.textPrimary, minHeight: '100vh', padding: mob ? '12px' : '20px 24px', fontFamily: T.font, letterSpacing: '0.01em' }}>
+    <div style={{ backgroundColor: T.bgDeep, color: T.textPrimary, minHeight: '100vh', padding: mob ? '10px' : '20px 24px', fontFamily: T.font, letterSpacing: '0.01em' }}>
       <div style={{ maxWidth: '1800px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: 'center', gap: mob ? '10px' : '12px', marginBottom: mob ? '16px' : '24px', padding: '8px 0' }}>
+        <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: 'center', gap: mob ? '8px' : '12px', marginBottom: mob ? '12px' : '24px', padding: '6px 0' }}>
           {navTabs}
           {weekNav}
           {toolbar}
@@ -518,27 +515,30 @@ function Planner({ session }) {
         {/* ── WEEKLY ── */}
         {view === 'week' && (mob ? (
           <>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '3px', marginBottom: '10px' }}>
               {weekDates.map((date, idx) => {
                 const ds = getDateStr(date), active = idx === mobDay, isT = ds === todayStr
                 return (
                   <button key={ds} onClick={() => setMobDay(idx)} style={{
-                    flex: 1, padding: '10px 0', backgroundColor: active ? T.accentGlow : 'transparent',
-                    border: '1px solid ' + (active ? T.accentMuted : 'transparent'), borderRadius: T.rSm,
-                    color: active ? T.accent : T.textSecondary, cursor: 'pointer', fontSize: '14px', fontWeight: '600',
-                    fontFamily: T.fontMono, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', position: 'relative',
+                    flex: 1, padding: '8px 0',
+                    backgroundColor: active ? T.accentGlow : 'transparent',
+                    border: '1px solid ' + (active ? T.accentMuted : 'transparent'),
+                    borderRadius: T.rSm,
+                    color: active ? T.accent : T.textSecondary, cursor: 'pointer',
+                    fontFamily: T.fontMono,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', position: 'relative',
                   }}>
-                    <span>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
-                    <span style={{ fontSize: '10px', fontWeight: '400', color: active ? T.accent : T.textMuted }}>{date.getDate()}</span>
-                    {isT && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '4px' }} />}
+                    <span style={{ fontSize: '11px', fontWeight: '700' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
+                    <span style={{ fontSize: '10px', color: active ? T.accent : T.textMuted }}>{date.getDate()}</span>
+                    {isT && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '3px' }} />}
                   </button>
                 )
               })}
             </div>
-            <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ minHeight: '300px' }}>
+            <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ minHeight: '200px' }}>
               {(() => {
                 const md = weekDates[mobDay], mds = getDateStr(md), mdow = md.getDay()
-                return <DayColumn key={mds} dateString={mds} date={md} isToday={mds === todayStr} isWeekend={mdow === 0 || mdow === 6} dayTasks={missionsByDate[mds] || []} inputValue={inputVals[mds] || ''} {...dcp} />
+                return <DayColumn key={mds} dateString={mds} date={md} isToday={mds === todayStr} isWeekend={mdow === 0 || mdow === 6} dayTasks={missionsByDate[mds] || []} {...dcp} />
               })()}
             </div>
           </>
@@ -547,14 +547,14 @@ function Planner({ session }) {
           const visibleDates = weekDates.slice(dayOffset, dayOffset + daysToShow)
           return (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center', padding: '12px', backgroundColor: T.bgSurfaceAlt, borderRadius: '8px', maxWidth: '600px', margin: '0 auto 20px auto', border: '1px solid ' + T.borderSubtle }}>
-                <button onClick={() => { if (dayOffset > 0) setDayOffset(o => o - 1) }} style={{ ...bBase, padding: '8px 14px', opacity: dayOffset === 0 ? 0.3 : 1, cursor: dayOffset === 0 ? 'default' : 'pointer', fontSize: '16px' }}>←</button>
-                <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center', padding: '10px 12px', backgroundColor: T.bgSurfaceAlt, borderRadius: '8px', maxWidth: '560px', margin: '0 auto 18px auto', border: '1px solid ' + T.borderSubtle }}>
+                <button onClick={() => { if (dayOffset > 0) setDayOffset(o => o - 1) }} style={{ ...bBase, padding: '6px 12px', opacity: dayOffset === 0 ? 0.3 : 1, cursor: dayOffset === 0 ? 'default' : 'pointer', fontSize: '16px' }}>←</button>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   {weekDates.map((date, idx) => {
                     const ds = getDateStr(date), isVisible = idx >= dayOffset && idx < dayOffset + daysToShow, isT = ds === todayStr
                     return (
                       <button key={ds} onClick={() => { if (idx < daysToShow) setDayOffset(0); else setDayOffset(Math.min(idx, maxOff)) }} style={{
-                        width: '42px', height: '42px',
+                        width: '38px', height: '38px',
                         backgroundColor: isVisible ? (isT ? T.accent : T.accentGlow) : 'transparent',
                         border: isVisible ? 'none' : '1px solid ' + T.borderSubtle, borderRadius: '6px',
                         color: isVisible ? (isT ? '#06140b' : T.accent) : T.textMuted, cursor: 'pointer',
@@ -562,19 +562,19 @@ function Planner({ session }) {
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
                         position: 'relative', transition: T.trF, boxShadow: isVisible && isT ? T.shGlow : 'none',
                       }}>
-                        <span style={{ fontSize: '10px' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
-                        <span style={{ fontSize: '14px' }}>{date.getDate()}</span>
-                        {isT && !isVisible && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '4px' }} />}
+                        <span style={{ fontSize: '9px' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
+                        <span style={{ fontSize: '13px' }}>{date.getDate()}</span>
+                        {isT && !isVisible && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '3px' }} />}
                       </button>
                     )
                   })}
                 </div>
-                <button onClick={() => { if (dayOffset < maxOff) setDayOffset(o => o + 1) }} style={{ ...bBase, padding: '8px 14px', opacity: dayOffset >= maxOff ? 0.3 : 1, cursor: dayOffset >= maxOff ? 'default' : 'pointer', fontSize: '16px' }}>→</button>
+                <button onClick={() => { if (dayOffset < maxOff) setDayOffset(o => o + 1) }} style={{ ...bBase, padding: '6px 12px', opacity: dayOffset >= maxOff ? 0.3 : 1, cursor: dayOffset >= maxOff ? 'default' : 'pointer', fontSize: '16px' }}>→</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: '14px', maxWidth: '1600px', margin: '0 auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: '12px', maxWidth: '1600px', margin: '0 auto' }}>
                 {visibleDates.map(date => {
                   const ds = getDateStr(date), dow = date.getDay()
-                  return <DayColumn key={ds} dateString={ds} date={date} isToday={ds === todayStr} isWeekend={dow === 0 || dow === 6} dayTasks={missionsByDate[ds] || []} inputValue={inputVals[ds] || ''} {...dcp} />
+                  return <DayColumn key={ds} dateString={ds} date={date} isToday={ds === todayStr} isWeekend={dow === 0 || dow === 6} dayTasks={missionsByDate[ds] || []} {...dcp} />
                 })}
               </div>
             </>
@@ -584,12 +584,11 @@ function Planner({ session }) {
         {/* ── MISSIONS ── */}
         {view === 'missions' && (
           <MissionsView
-            missions={activeMissions}
-            questTitleById={questTitleById}
+            quests={quests}
+            childrenByParent={childrenByParent}
             isMobile={mob}
-            onToggle={toggleComplete}
-            onDelete={deleteItem}
-            onJumpToQuest={jumpToQuest}
+            missionHandlers={missionHandlers}
+            onAddMission={addTopMissionById}
           />
         )}
 
@@ -608,12 +607,20 @@ function Planner({ session }) {
             onReactivateQuest={reactivateQuest}
             onDeleteQuest={deleteItem}
             onAddTopMission={addTopMission}
-            missionHandlers={{ onToggle: toggleComplete, onDelete: deleteItem, onAddSub: addSubMission }}
+            onRenameQuest={renameItem}
+            missionHandlers={missionHandlers}
           />
         )}
       </div>
 
       {impData && <ImportModal data={impData} onApply={applyImport} onCancel={() => setImpData(null)} />}
+      {editingMission && (
+        <MissionEditModal
+          mission={editingMission}
+          onSave={updateMission}
+          onClose={() => setEditingMission(null)}
+        />
+      )}
     </div>
   )
 }

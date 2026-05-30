@@ -85,7 +85,7 @@ export default function TaskCard({
             style={{
               ...eiStyle,
               flex: 1,
-              fontSize: '14px',
+              fontSize: isMobile ? '13px' : '14px',
               padding: '4px 8px',
               textDecoration: done ? 'line-through' : 'none',
               opacity: done ? 0.5 : 1,
@@ -95,7 +95,7 @@ export default function TaskCard({
         ) : (
           <span
             style={{
-              fontSize: '14px',
+              fontSize: isMobile ? '13px' : '14px',
               flex: 1,
               textDecoration: done ? 'line-through' : 'none',
               opacity: done ? 0.5 : 1,

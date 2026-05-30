@@ -1,151 +1,142 @@
+import { useState, useEffect } from 'react'
 import { T } from '../lib/theme'
-import { fmtTime } from '../lib/utils'
-
-function Chk({ done, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        width: 20,
-        height: 20,
-        minWidth: 20,
-        borderRadius: '4px',
-        border: '2px solid ' + (done ? T.accent : T.textMuted),
-        backgroundColor: done ? T.accent : 'transparent',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: T.trF,
-        flexShrink: 0,
-      }}
-    >
-      {done && (
-        <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
-          <path d="M2 5L4.5 7.5L8 3" stroke="#06140b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-  )
-}
+import MissionTree from './MissionTree'
 
 export default function MissionsView({
-  missions, questTitleById, isMobile, onToggle, onDelete, onJumpToQuest,
+  quests, childrenByParent, isMobile,
+  missionHandlers, onAddMission,
 }) {
-  function fmtDateTime(m) {
-    const parts = []
-    if (m.scheduledDate) {
-      const d = new Date(m.scheduledDate + 'T00:00:00')
-      parts.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+  const activeQuests = quests.filter(q => !q.archived)
+  const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id || null)
+  const [draft, setDraft] = useState('')
+
+  // Keep selectedQuestId in sync if the chosen quest gets archived/deleted
+  useEffect(() => {
+    if (!selectedQuestId || !activeQuests.some(q => q.id === selectedQuestId)) {
+      setSelectedQuestId(activeQuests[0]?.id || null)
     }
-    if (m.startTime != null) parts.push(fmtTime(m.startTime) + '–' + fmtTime(m.endTime))
-    return parts.join(' · ')
+  }, [activeQuests]) // eslint-disable-line
+
+  function submit() {
+    const t = draft.trim()
+    if (!t || !selectedQuestId) return
+    onAddMission(selectedQuestId, t)
+    setDraft('')
+  }
+
+  const labelStyle = {
+    display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono,
+    letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px',
+  }
+  const inpStyle = {
+    backgroundColor: T.bgInput, border: '1px solid ' + T.borderSubtle,
+    borderRadius: '4px', padding: isMobile ? '9px 12px' : '8px 12px',
+    color: T.textPrimary, fontSize: isMobile ? '14px' : '13px',
+    fontFamily: T.fontMono, outline: 'none', flex: 1,
   }
 
   return (
-    <div style={{ maxWidth: '760px', margin: '0 auto' }}>
-      <div
-        style={{
-          fontSize: '11px',
-          color: T.textMuted,
-          fontFamily: T.fontMono,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          marginBottom: '14px',
-          paddingBottom: '8px',
-          borderBottom: '1px solid ' + T.borderSubtle,
-        }}
-      >
-        ▌ Active Missions ({missions.length})
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+
+      {/* ── Add mission ── */}
+      <div style={{
+        backgroundColor: T.bgSurface,
+        border: '1px solid ' + T.borderSubtle,
+        borderRadius: T.rMd,
+        padding: isMobile ? '14px' : '16px',
+        marginBottom: '24px',
+      }}>
+        <div style={{ fontSize: '11px', color: T.accent, fontFamily: T.fontMono, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '12px', textShadow: T.textGlow }}>
+          ▌ New Mission
+        </div>
+
+        {activeQuests.length === 0 ? (
+          <div style={{ fontSize: '12px', color: T.textMuted, fontFamily: T.fontMono }}>
+            Create a quest first — missions must belong to a quest.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px' }}>
+            <div style={{ flexShrink: 0, minWidth: isMobile ? '100%' : '180px', maxWidth: isMobile ? '100%' : '220px' }}>
+              <label style={labelStyle}>Quest</label>
+              <select
+                value={selectedQuestId || ''}
+                onChange={e => setSelectedQuestId(e.target.value)}
+                style={{
+                  width: '100%', backgroundColor: T.bgInput,
+                  border: '1px solid ' + T.borderSubtle, borderRadius: '4px',
+                  padding: isMobile ? '9px 12px' : '8px 12px',
+                  color: T.textPrimary, fontSize: isMobile ? '14px' : '13px',
+                  fontFamily: T.fontMono, outline: 'none', cursor: 'pointer',
+                }}
+              >
+                {activeQuests.map(q => (
+                  <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Mission title</label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') submit() }}
+                  placeholder="New mission…"
+                  style={inpStyle}
+                />
+                <button
+                  onClick={submit}
+                  disabled={!draft.trim() || !selectedQuestId}
+                  style={{
+                    backgroundColor: T.accent, border: 'none', borderRadius: '4px',
+                    padding: isMobile ? '0 16px' : '0 14px',
+                    color: '#06140b', fontSize: '16px', fontWeight: '700',
+                    cursor: 'pointer', flexShrink: 0,
+                    opacity: !draft.trim() || !selectedQuestId ? 0.4 : 1,
+                  }}
+                >+</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {missions.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: T.textMuted, fontSize: '14px', fontFamily: T.fontMono }}>
-          No active missions. All clear, operative.
+      {/* ── Hierarchical missions grouped by quest ── */}
+      {activeQuests.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textMuted, fontSize: '13px', fontFamily: T.fontMono }}>
+          No active quests. Head to the Quests tab to get started.
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {missions.map(m => {
-          const meta = fmtDateTime(m)
-          return (
-            <div
-              key={m.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                backgroundColor: T.bgSurfaceAlt,
-                border: '1px solid ' + T.borderSubtle,
-                borderRadius: '6px',
-                padding: isMobile ? '12px 14px' : '10px 14px',
-                transition: 'all ' + T.trF,
-              }}
-            >
-              <Chk done={false} onClick={() => onToggle(m)} />
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: '14px',
-                    color: T.textPrimary,
-                    fontWeight: '500',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {m.title}
-                </div>
-                {meta && (
-                  <div style={{ fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono, marginTop: '2px' }}>
-                    {meta}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => onJumpToQuest(m.questId)}
-                title="Go to quest"
-                style={{
-                  flexShrink: 0,
-                  backgroundColor: T.accentDim,
-                  border: '1px solid ' + T.accentMuted,
-                  borderRadius: '12px',
-                  padding: '3px 10px',
-                  color: T.accent,
-                  fontSize: '10px',
-                  fontFamily: T.fontMono,
-                  letterSpacing: '0.04em',
-                  cursor: 'pointer',
-                  maxWidth: isMobile ? '110px' : '180px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                ◈ {questTitleById[m.questId] || 'Quest'}
-              </button>
-
-              <button
-                onClick={() => onDelete(m)}
-                style={{
-                  flexShrink: 0,
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  color: T.textMuted,
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  lineHeight: '1',
-                  padding: '0 2px',
-                }}
-              >
-                ×
-              </button>
+      {activeQuests.map(quest => {
+        const topLevel = childrenByParent[quest.id] || []
+        return (
+          <div key={quest.id} style={{ marginBottom: '28px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              marginBottom: '10px', paddingBottom: '8px',
+              borderBottom: '1px solid ' + T.borderSubtle,
+            }}>
+              <span style={{
+                fontSize: isMobile ? '12px' : '13px', fontFamily: T.fontMono,
+                color: T.accent, textShadow: T.textGlow,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+              }}>▸ {quest.title}</span>
+              <span style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono }}>
+                ({topLevel.length})
+              </span>
             </div>
-          )
-        })}
-      </div>
+            <MissionTree
+              topLevel={topLevel}
+              childrenByParent={childrenByParent}
+              handlers={missionHandlers}
+              isMobile={isMobile}
+              emptyMessage="No missions yet. Add one above."
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }

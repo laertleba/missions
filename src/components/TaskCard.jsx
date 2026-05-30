@@ -115,7 +115,7 @@ export default function TaskCard({
         )}
 
         <button
-          onClick={e => { e.stopPropagation(); onDelete(dateString, task.id) }}
+          onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${task.text}"?`)) onDelete(dateString, task.id) }}
           style={{
             backgroundColor: 'transparent',
             border: 'none',

@@ -156,7 +156,13 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
         )}
 
         <button
-          onClick={() => handlers.onDelete(mission)}
+          onClick={() => {
+            const kids = childrenByParent[mission.id] || []
+            const msg = kids.length
+              ? `Delete "${mission.title}" and its ${kids.length} sub-mission(s)?`
+              : `Delete "${mission.title}"?`
+            if (window.confirm(msg)) handlers.onDelete(mission)
+          }}
           style={{
             flexShrink: 0, backgroundColor: 'transparent', border: 'none',
             color: T.textMuted, cursor: 'pointer',

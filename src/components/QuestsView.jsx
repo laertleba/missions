@@ -203,7 +203,7 @@ export default function QuestsView({
               ) : (
                 <button onClick={() => onCompleteQuest(selected)} style={actionBtnStyle(T.accent, T.accentGlow, fs.btn)}>✓ Complete</button>
               )}
-              <button onClick={() => onDeleteQuest(selected)} style={actionBtnStyle(T.textMuted, 'transparent', fs.btn)}>✕ Delete</button>
+              <button onClick={() => { if (window.confirm(`Delete quest "${selected.title}" and all its missions?`)) onDeleteQuest(selected) }} style={actionBtnStyle(T.textMuted, 'transparent', fs.btn)}>✕ Delete</button>
             </div>
           </div>
 

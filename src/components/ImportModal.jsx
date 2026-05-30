@@ -1,9 +1,9 @@
 import { T } from '../lib/theme'
 
 export default function ImportModal({ data, onApply, onCancel }) {
-  const dc = Object.keys(data).length
-  let tc = 0
-  Object.values(data).forEach(a => { tc += a.length })
+  const list = data.items || []
+  const questCount = list.filter(i => i.type === 'quest').length
+  const missionCount = list.filter(i => i.type === 'mission').length
 
   function Btn({ label, onClick, accent }) {
     return (
@@ -18,6 +18,7 @@ export default function ImportModal({ data, onApply, onCancel }) {
           color: accent ? T.accent : T.textPrimary,
           cursor: 'pointer',
           fontSize: '13px',
+          fontFamily: T.fontMono,
           fontWeight: '500',
         }}
       >
@@ -32,7 +33,7 @@ export default function ImportModal({ data, onApply, onCancel }) {
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.78)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -44,18 +45,20 @@ export default function ImportModal({ data, onApply, onCancel }) {
         onClick={e => e.stopPropagation()}
         style={{
           backgroundColor: T.bgSurface,
-          border: '1px solid ' + T.borderSubtle,
+          border: '1px solid ' + T.accentMuted,
           borderRadius: T.rMd,
           padding: '24px',
           maxWidth: '400px',
           width: '100%',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          boxShadow: T.shGlow,
         }}
       >
-        <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: T.textPrimary }}>Import Tasks</h3>
-        <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: T.textSecondary }}>
-          Found <strong style={{ color: T.textPrimary }}>{tc}</strong> tasks across{' '}
-          <strong style={{ color: T.textPrimary }}>{dc}</strong> dates.
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: T.accent, fontFamily: T.fontMono, textShadow: T.textGlow, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          ▌ Import Backup
+        </h3>
+        <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: T.textSecondary, fontFamily: T.fontMono }}>
+          Found <strong style={{ color: T.textPrimary }}>{questCount}</strong> quests and{' '}
+          <strong style={{ color: T.textPrimary }}>{missionCount}</strong> missions.
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <Btn label="Replace All" onClick={() => onApply('replace')} accent />
@@ -71,6 +74,7 @@ export default function ImportModal({ data, onApply, onCancel }) {
               color: T.textMuted,
               cursor: 'pointer',
               fontSize: '13px',
+              fontFamily: T.fontMono,
             }}
           >
             Cancel

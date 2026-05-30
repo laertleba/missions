@@ -9,46 +9,57 @@ export function getDateStr(d) {
 }
 
 export function fmtTime(m) {
+  if (m == null) return ''
   return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
 }
 
-// Supabase row → local task object
-export function rowToTask(row) {
+// ── Supabase row → client item ──────────────────────────────
+// Client item carries both canonical fields and Weekly-compat aliases
+// (text/duration) so the existing TaskCard/DayColumn work unchanged.
+export function rowToItem(row) {
+  const start = row.start_time
+  const end = row.end_time
   return {
     id: row.id,
-    text: row.title,
-    duration: row.duration,
-    startTime: row.start_time,
-    endTime: row.end_time,
+    type: row.type,
+    title: row.title || '',
+    text: row.title || '', // alias for TaskCard
     completed: row.completed,
-    position: row.position,
+    completedAt: row.completed_at,
+    archived: row.archived,
+    questId: row.quest_id,
+    parentId: row.parent_id,
+    scheduledDate: row.scheduled_date, // 'YYYY-MM-DD' | null
+    startTime: start, // minutes | null
+    endTime: end,
+    duration: start != null && end != null ? end - start : 30,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
   }
 }
 
-// Local task → Supabase insert/update payload
-export function taskToRow(task, dateStr, userId) {
-  return {
-    id: task.id,
-    user_id: userId,
-    date_str: dateStr,
-    title: task.text,
-    duration: task.duration,
-    start_time: task.startTime,
-    end_time: task.endTime,
-    completed: task.completed,
-    position: task.position ?? 0,
+// ── Collect a mission + its whole descendant subtree (ids) ──
+export function collectSubtreeIds(items, rootId) {
+  const byParent = {}
+  for (const it of items) {
+    if (it.parentId) (byParent[it.parentId] ||= []).push(it.id)
   }
+  const out = []
+  const stack = [rootId]
+  while (stack.length) {
+    const id = stack.pop()
+    out.push(id)
+    for (const child of byParent[id] || []) stack.push(child)
+  }
+  return out
 }
 
-// Array of Supabase rows → { dateStr: Task[] }
-export function rowsToMap(rows) {
-  const map = {}
-  for (const row of rows) {
-    if (!map[row.date_str]) map[row.date_str] = []
-    map[row.date_str].push(rowToTask(row))
-  }
-  for (const arr of Object.values(map)) {
-    arr.sort((a, b) => a.position - b.position)
-  }
-  return map
+// ── Compute depth of each item by walking parent chain ──────
+// Used by Import to insert parents before children (FK ordering).
+export function computeDepth(item, byId, cache = {}) {
+  if (cache[item.id] != null) return cache[item.id]
+  if (!item.parent_id) return (cache[item.id] = 0)
+  const parent = byId[item.parent_id]
+  if (!parent) return (cache[item.id] = 1)
+  return (cache[item.id] = computeDepth(parent, byId, cache) + 1)
 }

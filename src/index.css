@@ -1,17 +1,54 @@
 * { box-sizing: border-box; }
-body { margin: 0; padding: 0; background-color: #0f0f12; overscroll-behavior: none; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #070b07;
+  overscroll-behavior: none;
+}
+
+/* ── Faint CRT scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
+
+/* Subtle phosphor vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.35) 100%);
+}
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #2a2a32; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
+::-webkit-scrollbar-thumb { background: #1a2c1a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2bff88; }
 
 input, select { color-scheme: dark; }
-input:focus { border-color: #a08060 !important; box-shadow: 0 0 0 2px rgba(160,128,96,0.15) !important; }
+input:focus, select:focus {
+  border-color: #2bff88 !important;
+  box-shadow: 0 0 0 2px rgba(43, 255, 136, 0.18) !important;
+}
 
-button { transition: background-color 0.15s ease, transform 0.1s ease, filter 0.15s ease; }
-button:hover { filter: brightness(1.2); }
-button:active { transform: scale(0.97); }
+button { transition: background-color 0.15s ease, transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease; }
+button:hover:not(:disabled) { filter: brightness(1.18); }
+button:active:not(:disabled) { transform: scale(0.97); }
 
 @media (max-width: 768px) {
   input[type="text"],

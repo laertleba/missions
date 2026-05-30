@@ -4,7 +4,7 @@ import { fmtTime } from '../lib/utils'
 function Chk({ size }) {
   return (
     <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 10 10" fill="none" style={{ display: 'block' }}>
-      <path d="M2 5L4.5 7.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 5L4.5 7.5L8 3" stroke="#06140b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }

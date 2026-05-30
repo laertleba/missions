@@ -1,6 +1,15 @@
-# Missions — Weekly Task Planner
+# Missions — Quest System
 
-Personal weekly time-slot planner. PWA installable, Supabase-backed, syncs across devices.
+Personal goal-planning system with a Pip-Boy phosphor-terminal aesthetic. PWA installable, Supabase-backed, real-time synced across devices.
+
+**Model:** one self-referential `items` table. **Quests** (high-level) own **Missions** (the work). Missions are recursive — a mission's parent can be its quest (top-level) or another mission (nested, any depth). Every mission stores both its immediate `parent_id` and its owning root `quest_id`.
+
+**Views:**
+- **Weekly** — day-column time-slot planner; quick-add creates a mission under the selected quest. Completed missions stay (checked/dimmed).
+- **Missions** — flat list of *active* missions across all quests; completing one removes it from this list only. Each row badges its owning quest.
+- **Quests** — two-pane Pip-Boy quest log: selectable quest list (Active / History filter) on the left, the selected quest's threaded mission tree on the right.
+
+**Cascade rules:** completing a quest completes all its missions then archives the quest; completing a mission completes its whole subtree (not the parent/quest); deletes cascade through the subtree. All actions are immediate — no confirmations.
 
 ---
 
@@ -33,57 +42,15 @@ Go to [supabase.com](https://supabase.com), create a new project. Note the URL a
 Supabase Dashboard → Authentication → Users → Add user  
 Enter your email and password. This is the single account that gates the app.
 
-### 3. Run this SQL in the SQL Editor
+### 3. Run the migration in the SQL Editor
 
-```sql
--- ─── Schema ───────────────────────────────────────────────────
-CREATE TABLE tasks (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  date_str    TEXT NOT NULL,          -- 'YYYY-MM-DD'
-  title       TEXT NOT NULL DEFAULT '',
-  duration    INT  NOT NULL DEFAULT 30,   -- minutes
-  start_time  INT  NOT NULL DEFAULT 540,  -- minutes from midnight
-  end_time    INT  NOT NULL DEFAULT 570,
-  completed   BOOLEAN NOT NULL DEFAULT FALSE,
-  position    INT  NOT NULL DEFAULT 0,    -- sort order within a day
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+Open [`migrations/0001_quests_and_missions.sql`](migrations/0001_quests_and_missions.sql), copy its **entire contents**, paste into the Supabase SQL Editor, and **Run**.
 
-CREATE INDEX tasks_user_date ON tasks (user_id, date_str);
+It creates the self-referential `items` table (with shape constraints), the per-user RLS policies, the `updated_at` trigger, the `complete_subtree` and `complete_quest` cascade functions, and enables Realtime on `items`. It also drops the old placeholder `tasks` table.
 
--- ─── Row Level Security ───────────────────────────────────────
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+> If the Supabase CLI is linked (`supabase link`), you can instead run `supabase db push` from the repo to apply everything in `migrations/`.
 
-CREATE POLICY "select own tasks" ON tasks
-  FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "insert own tasks" ON tasks
-  FOR INSERT WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "update own tasks" ON tasks
-  FOR UPDATE USING (user_id = auth.uid());
-
-CREATE POLICY "delete own tasks" ON tasks
-  FOR DELETE USING (user_id = auth.uid());
-
--- ─── Auto-update updated_at ───────────────────────────────────
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER tasks_updated_at
-  BEFORE UPDATE ON tasks
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
--- ─── Enable Realtime (cross-device live sync) ─────────────────
-ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
-```
+After running it, **create your first quest** in the Quests view — the Weekly quick-add stays disabled until at least one quest exists (a mission must belong to a quest).
 
 ---
 
@@ -115,12 +82,10 @@ Add the CNAME record Cloudflare shows you to your DNS.
 
 ---
 
-## Migrating existing tasks from the old app
+## Backup & restore
 
-1. Open the old `Weekly Schedule Personal.html` app.
-2. Toolbar → **↓ Export** — saves `tasks-backup-YYYY-MM-DD.json`.
-3. Open the new Missions app, sign in.
-4. Toolbar → **↑ Import** → select the JSON file → choose **Replace All** (clean start) or **Merge**.
+- **Export** (toolbar → ↓ Export) saves a `missions-backup-YYYY-MM-DD.json` containing all quests and missions (schema v2).
+- **Import** (toolbar → ↑ Import) reads that file, remaps IDs (preserving the quest/mission tree), and inserts parents-before-children. Choose **Replace All** to wipe first, or **Merge** to append.
 
 ---
 

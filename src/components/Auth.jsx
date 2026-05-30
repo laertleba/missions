@@ -60,13 +60,16 @@ export default function Auth() {
             fontSize: '22px',
             fontWeight: '700',
             color: T.accent,
-            letterSpacing: '-0.02em',
+            fontFamily: T.fontMono,
+            textShadow: T.textGlow,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
           }}
         >
-          Missions
+          ▌ Missions
         </h1>
-        <p style={{ margin: '0 0 28px 0', fontSize: '13px', color: T.textMuted }}>
-          Sign in to access your planner
+        <p style={{ margin: '0 0 28px 0', fontSize: '13px', color: T.textMuted, fontFamily: T.fontMono }}>
+          Authenticate to access terminal
         </p>
 
         <form onSubmit={handleLogin}>

@@ -155,7 +155,7 @@ function Planner({ session }) {
 
   function mkMission({ id, title, questId, parentId, scheduledDate = null, startTime = null, endTime = null, sortOrder }) {
     return {
-      id, type: 'mission', title, text: title, completed: false, archived: false,
+      id, type: 'mission', title, text: title, completed: false, archived: false, starred: false,
       questId, parentId, scheduledDate, startTime, endTime,
       duration: startTime != null && endTime != null ? endTime - startTime : 30,
       sortOrder, createdAt: new Date().toISOString(),
@@ -206,6 +206,12 @@ function Planner({ session }) {
   async function renameItem(id, title) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, title, text: title } : it))
     await runWrite(supabase.from('items').update({ title }).eq('id', id))
+  }
+
+  async function toggleStar(item) {
+    const newStarred = !item.starred
+    setItems(prev => prev.map(it => it.id === item.id ? { ...it, starred: newStarred } : it))
+    await runWrite(supabase.from('items').update({ starred: newStarred }).eq('id', item.id))
   }
 
   // ── Mission CRUD ──
@@ -343,6 +349,7 @@ function Planner({ session }) {
   function exportItems() {
     const rows = items.map(it => ({
       id: it.id, type: it.type, title: it.title, completed: it.completed, archived: it.archived,
+      starred: it.starred || false,
       quest_id: it.questId, parent_id: it.parentId, scheduled_date: it.scheduledDate,
       start_time: it.startTime, end_time: it.endTime, sort_order: it.sortOrder,
     }))
@@ -380,6 +387,7 @@ function Planner({ session }) {
     const rows = src.map(it => ({
       id: idMap.get(it.id), user_id: userId, type: it.type, title: it.title || '',
       completed: !!it.completed, archived: !!it.archived,
+      starred: !!it.starred,
       completed_at: it.completed ? new Date().toISOString() : null,
       quest_id: it.quest_id ? idMap.get(it.quest_id) : null,
       parent_id: it.parent_id ? idMap.get(it.parent_id) : null,
@@ -429,6 +437,7 @@ function Planner({ session }) {
     onDelete: deleteItem,
     onAddSub: addSubMission,
     onEdit: setEditingMission,
+    onStar: toggleStar,
   }
 
   // ── Sync indicator ──

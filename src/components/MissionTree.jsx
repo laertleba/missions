@@ -34,7 +34,7 @@ function metaLabel(m) {
   return parts.join(' · ')
 }
 
-function MissionNode({ mission, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile }) {
+function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -42,6 +42,7 @@ function MissionNode({ mission, childrenByParent, collapsed, onToggleCollapse, d
   const hasKids = kids.length > 0
   const isOpen = !collapsed.has(mission.id)
   const done = mission.completed
+  const starred = !!mission.starred
   const meta = metaLabel(mission)
   const fs = isMobile ? '12px' : '13.5px'
   const pad = isMobile ? '6px 8px' : '8px 10px'
@@ -57,51 +58,89 @@ function MissionNode({ mission, childrenByParent, collapsed, onToggleCollapse, d
     <div style={{ position: 'relative' }}>
       <div
         style={{
-          display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '8px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: isMobile ? '6px' : '8px',
           padding: pad,
-          backgroundColor: done ? T.bgInput : T.bgSurfaceAlt,
-          border: '1px solid ' + T.borderSubtle,
+          backgroundColor: starred
+            ? 'rgba(255,179,64,0.06)'
+            : (done ? T.bgInput : T.bgSurfaceAlt),
+          border: '1px solid ' + (starred ? 'rgba(255,179,64,0.35)' : T.borderSubtle),
           borderRadius: '5px',
-          opacity: done ? 0.6 : 1,
+          opacity: done ? 0.65 : 1,
           transition: 'all ' + T.trF,
         }}
       >
+        {/* Collapse toggle */}
         <button
           onClick={() => hasKids && onToggleCollapse(mission.id)}
           style={{
-            width: 14, minWidth: 14, backgroundColor: 'transparent', border: 'none',
+            width: 14, minWidth: 14, marginTop: '2px',
+            backgroundColor: 'transparent', border: 'none',
             color: hasKids ? T.accent : 'transparent',
             cursor: hasKids ? 'pointer' : 'default',
             fontSize: '10px', fontFamily: T.fontMono, padding: 0,
             transition: 'transform ' + T.trF,
             transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            flexShrink: 0,
           }}
         >▸</button>
 
         <Chk done={done} onClick={() => handlers.onToggle(mission)} size={isMobile ? 16 : 18} />
 
-        {/* Clickable title → edit modal */}
-        <span
-          onClick={() => handlers.onEdit && handlers.onEdit(mission)}
-          title="Click to edit"
-          style={{
-            flex: 1, minWidth: 0,
-            fontSize: fs,
-            color: T.textPrimary,
-            textDecoration: done ? 'line-through' : 'none',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            cursor: handlers.onEdit ? 'pointer' : 'default',
-          }}
-        >
-          {mission.title}
-        </span>
+        {/* Title + quest label */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span
+            onClick={() => handlers.onEdit && handlers.onEdit(mission)}
+            title="Click to edit"
+            style={{
+              fontSize: fs,
+              color: T.textPrimary,
+              textDecoration: done ? 'line-through' : 'none',
+              lineHeight: '1.45',
+              wordBreak: 'break-word',
+              cursor: handlers.onEdit ? 'pointer' : 'default',
+            }}
+          >
+            {mission.title}
+          </span>
+          {questLabel && (
+            <span style={{
+              fontSize: '9px', color: T.textMuted,
+              fontFamily: T.fontMono, letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}>
+              ▸ {questLabel}
+            </span>
+          )}
+        </div>
 
         {meta && (
-          <span style={{ fontSize: isMobile ? '9px' : '10px', color: T.textMuted, fontFamily: T.fontMono, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{
+            fontSize: isMobile ? '9px' : '10px', color: T.textMuted,
+            fontFamily: T.fontMono, whiteSpace: 'nowrap',
+            flexShrink: 0, marginTop: '2px',
+          }}>
             {meta}
           </span>
         )}
 
+        {/* Star */}
+        <button
+          onClick={() => handlers.onStar && handlers.onStar(mission)}
+          title={starred ? 'Unstar' : 'Mark as important'}
+          style={{
+            flexShrink: 0, backgroundColor: 'transparent', border: 'none',
+            color: starred ? T.amber : T.textMuted,
+            cursor: 'pointer',
+            fontSize: isMobile ? '13px' : '14px',
+            lineHeight: '1', padding: '0 1px',
+            textShadow: starred ? '0 0 6px rgba(255,179,64,0.55)' : 'none',
+            transition: 'color ' + T.trF,
+          }}
+        >{starred ? '★' : '☆'}</button>
+
+        {/* Add sub-mission (desktop only) */}
         {!isMobile && (
           <button
             onClick={() => setAdding(a => !a)}
@@ -161,7 +200,7 @@ function MissionNode({ mission, childrenByParent, collapsed, onToggleCollapse, d
   )
 }
 
-export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage }) {
+export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
 
   function onToggleCollapse(id) {
@@ -179,7 +218,17 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {topLevel.map(m => (
-        <MissionNode key={m.id} mission={m} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={0} handlers={handlers} isMobile={isMobile} />
+        <MissionNode
+          key={m.id}
+          mission={m}
+          questLabel={questLabels ? questLabels.get(m.id) : undefined}
+          childrenByParent={childrenByParent}
+          collapsed={collapsed}
+          onToggleCollapse={onToggleCollapse}
+          depth={0}
+          handlers={handlers}
+          isMobile={isMobile}
+        />
       ))}
     </div>
   )

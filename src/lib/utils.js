@@ -35,6 +35,7 @@ export function rowToItem(row) {
     duration: start != null && end != null ? end - start : 30,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+    starred: !!row.starred,
   }
 }
 

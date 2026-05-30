@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { T } from '../lib/theme'
 import MissionTree from './MissionTree'
 
@@ -6,7 +6,9 @@ export default function MissionsView({
   quests, childrenByParent, isMobile,
   missionHandlers, onAddMission,
 }) {
-  const activeQuests = quests.filter(q => !q.archived)
+  const activeQuests = useMemo(() => quests.filter(q => !q.archived), [quests])
+  const questsById = useMemo(() => Object.fromEntries(quests.map(q => [q.id, q])), [quests])
+
   const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id || null)
   const [draft, setDraft] = useState('')
 
@@ -16,6 +18,28 @@ export default function MissionsView({
       setSelectedQuestId(activeQuests[0]?.id || null)
     }
   }, [activeQuests]) // eslint-disable-line
+
+  // All top-level missions across active quests, sorted: starred first → scheduled date asc (nulls last) → createdAt asc
+  const allTopLevel = useMemo(() => {
+    const missions = activeQuests.flatMap(q => childrenByParent[q.id] || [])
+    return [...missions].sort((a, b) => {
+      if (a.starred !== b.starred) return a.starred ? -1 : 1
+      if (a.scheduledDate && b.scheduledDate) return a.scheduledDate < b.scheduledDate ? -1 : 1
+      if (a.scheduledDate) return -1
+      if (b.scheduledDate) return 1
+      return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1
+    })
+  }, [activeQuests, childrenByParent])
+
+  // Map mission id → quest title, for badges on each root item
+  const questLabels = useMemo(() => {
+    const m = new Map()
+    for (const mission of allTopLevel) {
+      const quest = questsById[mission.questId]
+      if (quest) m.set(mission.id, quest.title)
+    }
+    return m
+  }, [allTopLevel, questsById])
 
   function submit() {
     const t = draft.trim()
@@ -44,7 +68,7 @@ export default function MissionsView({
         border: '1px solid ' + T.borderSubtle,
         borderRadius: T.rMd,
         padding: isMobile ? '14px' : '16px',
-        marginBottom: '24px',
+        marginBottom: '20px',
       }}>
         <div style={{ fontSize: '11px', color: T.accent, fontFamily: T.fontMono, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '12px', textShadow: T.textGlow }}>
           ▌ New Mission
@@ -102,41 +126,21 @@ export default function MissionsView({
         )}
       </div>
 
-      {/* ── Hierarchical missions grouped by quest ── */}
-      {activeQuests.length === 0 && (
+      {/* ── Flat mission list ── */}
+      {activeQuests.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textMuted, fontSize: '13px', fontFamily: T.fontMono }}>
           No active quests. Head to the Quests tab to get started.
         </div>
+      ) : (
+        <MissionTree
+          topLevel={allTopLevel}
+          childrenByParent={childrenByParent}
+          handlers={missionHandlers}
+          isMobile={isMobile}
+          questLabels={questLabels}
+          emptyMessage="No missions yet. Add one above."
+        />
       )}
-
-      {activeQuests.map(quest => {
-        const topLevel = childrenByParent[quest.id] || []
-        return (
-          <div key={quest.id} style={{ marginBottom: '28px' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              marginBottom: '10px', paddingBottom: '8px',
-              borderBottom: '1px solid ' + T.borderSubtle,
-            }}>
-              <span style={{
-                fontSize: isMobile ? '12px' : '13px', fontFamily: T.fontMono,
-                color: T.accent, textShadow: T.textGlow,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
-              }}>▸ {quest.title}</span>
-              <span style={{ fontSize: '10px', color: T.textMuted, fontFamily: T.fontMono }}>
-                ({topLevel.length})
-              </span>
-            </div>
-            <MissionTree
-              topLevel={topLevel}
-              childrenByParent={childrenByParent}
-              handlers={missionHandlers}
-              isMobile={isMobile}
-              emptyMessage="No missions yet. Add one above."
-            />
-          </div>
-        )
-      })}
     </div>
   )
 }

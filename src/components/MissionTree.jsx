@@ -52,8 +52,8 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
   const fs = isMobile ? '12px' : '13.5px'
   const pad = isMobile ? '6px 8px' : '8px 10px'
 
-  const isDragging = dragCtx?.dragging?.id === mission.id
-  const isDragOver = dragCtx?.dragOverId === mission.id
+  const isDragging = !!dragCtx && dragCtx.dragging?.id === mission.id
+  const isDragOver = !!dragCtx && dragCtx.dragOverId === mission.id
 
   function submitSub() {
     const t = draft.trim()
@@ -85,19 +85,21 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           transition: 'all ' + T.trF,
         }}
       >
-        {/* Drag handle */}
-        <span
-          draggable
-          onDragStart={e => { e.stopPropagation(); dragCtx?.onDragStart(mission) }}
-          onDragEnd={() => dragCtx?.onDragEnd()}
-          title="Drag to reorder"
-          style={{
-            flexShrink: 0, marginTop: '3px',
-            color: T.textMuted, cursor: 'grab',
-            fontSize: '11px', lineHeight: 1,
-            userSelect: 'none', opacity: 0.5,
-          }}
-        >⠿</span>
+        {/* Drag handle — only rendered when dragCtx is active (sortable tree) */}
+        {dragCtx && (
+          <span
+            draggable
+            onDragStart={e => { e.stopPropagation(); dragCtx.onDragStart(mission) }}
+            onDragEnd={() => dragCtx.onDragEnd()}
+            title="Drag to reorder"
+            style={{
+              flexShrink: 0, marginTop: '3px',
+              color: T.textMuted, cursor: 'grab',
+              fontSize: '11px', lineHeight: 1,
+              userSelect: 'none', opacity: 0.5,
+            }}
+          >⠿</span>
+        )}
 
         {/* Collapse toggle */}
         <button
@@ -191,7 +193,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
   )
 }
 
-export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels, deprioritizeCompleted }) {
+export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels, deprioritizeCompleted, sortable = false }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
   const [dragging, setDragging] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
@@ -216,13 +218,14 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
 
   function reset() { setDragging(null); setDragOverId(null) }
 
-  const dragCtx = {
+  // Only expose dragCtx when sortable=true; passing null disables the drag handle
+  const dragCtx = sortable ? {
     dragging, dragOverId,
     onDragStart: m => setDragging(m),
     onDragOver: id => setDragOverId(id),
     onDropOn: handleDropOn,
     onDragEnd: reset,
-  }
+  } : null
 
   const sortedTopLevel = deprioritizeCompleted
     ? [...topLevel].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1))

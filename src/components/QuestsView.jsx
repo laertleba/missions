@@ -228,7 +228,7 @@ export default function QuestsView({
             </div>
           )}
 
-          <MissionTree topLevel={topLevel} childrenByParent={childrenByParent} handlers={missionHandlers} isMobile={isMobile} deprioritizeCompleted />
+          <MissionTree topLevel={topLevel} childrenByParent={childrenByParent} handlers={missionHandlers} isMobile={isMobile} deprioritizeCompleted sortable />
         </>
       )}
     </div>

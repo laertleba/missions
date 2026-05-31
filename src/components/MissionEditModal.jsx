@@ -99,39 +99,59 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
             style={{ ...inp, marginBottom: '14px' }}
           />
 
-          {isTopLevel && activeQuests.length > 1 && (
+          {expanded ? (
+            /* ── expanded: all secondary fields on one row ── */
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              {isTopLevel && activeQuests.length > 1 && (
+                <div style={{ flex: '2 1 160px', minWidth: 0 }}>
+                  <label style={lbl}>Quest</label>
+                  <select value={questId} onChange={e => setQuestId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                    {activeQuests.map(q => (
+                      <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+                <label style={lbl}>Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+              </div>
+              <div style={{ flex: '1 1 100px', minWidth: 0 }}>
+                <label style={lbl}>Start time</label>
+                <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
+              </div>
+              <div style={{ flex: '1 1 80px', minWidth: 0 }}>
+                <label style={lbl}>Duration (min)</label>
+                <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
+              </div>
+            </div>
+          ) : (
+            /* ── compact: stacked layout ── */
             <>
-              <label style={lbl}>Quest</label>
-              <select
-                value={questId}
-                onChange={e => setQuestId(e.target.value)}
-                style={{ ...inp, marginBottom: '14px', cursor: 'pointer' }}
-              >
-                {activeQuests.map(q => (
-                  <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
-                ))}
-              </select>
+              {isTopLevel && activeQuests.length > 1 && (
+                <>
+                  <label style={lbl}>Quest</label>
+                  <select value={questId} onChange={e => setQuestId(e.target.value)} style={{ ...inp, marginBottom: '14px', cursor: 'pointer' }}>
+                    {activeQuests.map(q => (
+                      <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+              <label style={lbl}>Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: '14px' }} />
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Start time</label>
+                  <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={lbl}>Duration (min)</label>
+                  <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
+                </div>
+              </div>
             </>
           )}
-
-          <label style={lbl}>Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ ...inp, marginBottom: '14px' }}
-          />
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={lbl}>Start time</label>
-              <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={lbl}>Duration (min)</label>
-              <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
-            </div>
-          </div>
 
           <label style={lbl}>Notes</label>
           <textarea

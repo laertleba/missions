@@ -9,11 +9,17 @@ function timeStrToMinutes(str) {
   return h * 60 + m
 }
 
-export default function MissionEditModal({ mission, onSave, onClose }) {
+export default function MissionEditModal({ mission, onSave, onClose, quests = [] }) {
   const [title, setTitle] = useState(mission.title)
   const [date, setDate] = useState(mission.scheduledDate || '')
   const [startStr, setStartStr] = useState(mission.startTime != null ? fmtTime(mission.startTime) : '')
   const [duration, setDuration] = useState(mission.duration || 30)
+  const [notes, setNotes] = useState(mission.notes || '')
+  const [questId, setQuestId] = useState(mission.questId || '')
+
+  // Only top-level missions (parentId === questId) can be moved to another quest
+  const isTopLevel = mission.parentId === mission.questId
+  const activeQuests = quests.filter(q => !q.archived)
 
   function handleSave() {
     const startTime = timeStrToMinutes(startStr)
@@ -22,6 +28,8 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
       scheduledDate: date || null,
       startTime,
       duration: Number(duration) || 30,
+      notes,
+      questId: questId !== mission.questId ? questId : undefined,
     })
     onClose()
   }
@@ -38,6 +46,10 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
     width: '100%',
     boxSizing: 'border-box',
   }
+  const lbl = {
+    display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono,
+    marginBottom: '4px', letterSpacing: '0.06em', textTransform: 'uppercase',
+  }
 
   return (
     <div
@@ -47,6 +59,7 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
         backgroundColor: 'rgba(0,0,0,0.78)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 200, padding: '20px',
+        overflowY: 'auto',
       }}
     >
       <div
@@ -56,7 +69,7 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
           border: '1px solid ' + T.accentMuted,
           borderRadius: T.rMd,
           padding: '24px',
-          maxWidth: '420px',
+          maxWidth: '460px',
           width: '100%',
           boxShadow: T.shGlow,
         }}
@@ -65,16 +78,31 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
           ▌ Edit Mission
         </h3>
 
-        <label style={{ display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Title</label>
+        <label style={lbl}>Title</label>
         <input
           autoFocus
           value={title}
           onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose() }}
+          onKeyDown={e => { if (e.key === 'Escape') onClose() }}
           style={{ ...inp, marginBottom: '14px' }}
         />
 
-        <label style={{ display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Date</label>
+        {isTopLevel && activeQuests.length > 1 && (
+          <>
+            <label style={lbl}>Quest</label>
+            <select
+              value={questId}
+              onChange={e => setQuestId(e.target.value)}
+              style={{ ...inp, marginBottom: '14px', cursor: 'pointer' }}
+            >
+              {activeQuests.map(q => (
+                <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
+              ))}
+            </select>
+          </>
+        )}
+
+        <label style={lbl}>Date</label>
         <input
           type="date"
           value={date}
@@ -82,28 +110,30 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
           style={{ ...inp, marginBottom: '14px' }}
         />
 
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Start time</label>
-            <input
-              type="time"
-              value={startStr}
-              onChange={e => setStartStr(e.target.value)}
-              style={inp}
-            />
+            <label style={lbl}>Start time</label>
+            <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '11px', color: T.textMuted, fontFamily: T.fontMono, marginBottom: '4px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Duration (min)</label>
-            <input
-              type="number"
-              min="5"
-              step="5"
-              value={duration}
-              onChange={e => setDuration(e.target.value)}
-              style={inp}
-            />
+            <label style={lbl}>Duration (min)</label>
+            <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
           </div>
         </div>
+
+        <label style={lbl}>Notes</label>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Optional notes…"
+          rows={3}
+          style={{
+            ...inp,
+            marginBottom: '20px',
+            resize: 'vertical',
+            lineHeight: '1.5',
+          }}
+        />
 
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -114,9 +144,7 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
               backgroundColor: 'transparent', color: T.textMuted,
               cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono,
             }}
-          >
-            Cancel
-          </button>
+          >Cancel</button>
           <button
             onClick={handleSave}
             style={{
@@ -126,9 +154,7 @@ export default function MissionEditModal({ mission, onSave, onClose }) {
               cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono,
               fontWeight: '600', textShadow: T.textGlow,
             }}
-          >
-            Save
-          </button>
+          >Save</button>
         </div>
       </div>
     </div>

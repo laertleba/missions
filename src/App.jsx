@@ -40,8 +40,7 @@ function Planner({ session }) {
   // Default dayOffset so today is in the visible 4-day window
   const [dayOffset, setDayOffset] = useState(() => {
     const dow = new Date().getDay()
-    const idx = dow === 0 ? 6 : dow - 1 // Mon=0 … Sun=6
-    return Math.min(idx, 3)             // clamp to max offset (7-4)
+    return dow === 0 ? 6 : dow - 1 // Mon=0 … Sun=6; no clamp — today is always first
   })
   const [mob, setMob] = useState(window.innerWidth < 768)
   const [mobDay, setMobDay] = useState(() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1 })
@@ -123,7 +122,8 @@ function Planner({ session }) {
     const dow = t.getDay()
     const diff = dow === 0 ? -6 : 1 - dow
     const start = new Date(t); start.setDate(t.getDate() + diff + weekOff * 7)
-    return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d })
+    // 10 days so today can always be the first visible column (Sun + 3 overflow into next week)
+    return Array.from({ length: 10 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d })
   }
   const weekDates = getWeekDates()
 
@@ -131,7 +131,7 @@ function Planner({ session }) {
     setWeekOff(0)
     const dow = new Date().getDay()
     const idx = dow === 0 ? 6 : dow - 1
-    setDayOffset(Math.min(idx, 3))
+    setDayOffset(idx)
   }
 
   function nextTime(ds, isToday) {
@@ -156,7 +156,7 @@ function Planner({ session }) {
 
   function mkMission({ id, title, questId, parentId, scheduledDate = null, startTime = null, endTime = null, sortOrder }) {
     return {
-      id, type: 'mission', title, text: title, completed: false, archived: false, starred: false,
+      id, type: 'mission', title, text: title, completed: false, archived: false, starred: false, notes: '',
       questId, parentId, scheduledDate, startTime, endTime,
       duration: startTime != null && endTime != null ? endTime - startTime : 30,
       sortOrder, createdAt: new Date().toISOString(),
@@ -241,24 +241,55 @@ function Planner({ session }) {
   }
 
   // Edit all fields of a mission in one call
-  async function updateMission(id, { title, scheduledDate, startTime, duration }) {
+  async function updateMission(id, { title, scheduledDate, startTime, duration, notes, questId: newQuestId }) {
     const item = items.find(it => it.id === id)
     if (!item) return
     const newStart = startTime !== undefined ? startTime : item.startTime
     const newDur = duration !== undefined ? Number(duration) : item.duration
     const newEnd = newStart != null ? newStart + newDur : null
+
+    // Handle quest change: only allowed for top-level missions
+    if (newQuestId && newQuestId !== item.questId) {
+      const isTopLevel = item.parentId === item.questId
+      if (isTopLevel) {
+        const subtreeIds = collectSubtreeIds(items, id)
+        setItems(prev => prev.map(it => {
+          if (!subtreeIds.includes(it.id)) return it
+          return { ...it, questId: newQuestId, ...(it.id === id ? { parentId: newQuestId } : {}) }
+        }))
+        await supabase.from('items').update({ quest_id: newQuestId, parent_id: newQuestId }).eq('id', id)
+        const descendants = subtreeIds.filter(sid => sid !== id)
+        if (descendants.length) await supabase.from('items').update({ quest_id: newQuestId }).in('id', descendants)
+      }
+    }
+
     setItems(prev => prev.map(it => it.id !== id ? it : {
       ...it,
       title: title ?? it.title, text: title ?? it.title,
       scheduledDate: scheduledDate !== undefined ? (scheduledDate || null) : it.scheduledDate,
       startTime: newStart, endTime: newEnd, duration: newDur,
+      notes: notes !== undefined ? notes : it.notes,
     }))
     await runWrite(supabase.from('items').update({
       title: title ?? item.title,
       scheduled_date: scheduledDate !== undefined ? (scheduledDate || null) : item.scheduledDate,
       start_time: newStart ?? null,
       end_time: newEnd,
+      notes: notes !== undefined ? notes : item.notes,
     }).eq('id', id))
+  }
+
+  async function reorderMissions(parentId, orderedIds) {
+    const updates = orderedIds.map((id, i) => ({ id, sortOrder: (i + 1) * 1000 }))
+    setItems(prev => {
+      const sortMap = new Map(updates.map(u => [u.id, u.sortOrder]))
+      return prev.map(it => sortMap.has(it.id) ? { ...it, sortOrder: sortMap.get(it.id) } : it)
+    })
+    setSync('syncing')
+    const res = await Promise.all(updates.map(({ id, sortOrder }) =>
+      supabase.from('items').update({ sort_order: sortOrder }).eq('id', id)
+    ))
+    setSync(res.some(r => r.error) ? 'error' : 'synced')
   }
 
   async function toggleComplete(item) {
@@ -447,6 +478,7 @@ function Planner({ session }) {
     onEdit: setEditingMission,
     onStar: toggleStar,
     onToday: setMissionToday,
+    onReorder: reorderMissions,
   }
 
   // ── Sync indicator ──
@@ -558,17 +590,17 @@ function Planner({ session }) {
             </div>
           </>
         ) : (() => {
-          const daysToShow = 4, maxOff = 7 - daysToShow
+          const daysToShow = 4, maxOff = weekDates.length - daysToShow
           const visibleDates = weekDates.slice(dayOffset, dayOffset + daysToShow)
           return (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center', padding: '10px 12px', backgroundColor: T.bgSurfaceAlt, borderRadius: '8px', maxWidth: '560px', margin: '0 auto 18px auto', border: '1px solid ' + T.borderSubtle }}>
                 <button onClick={() => { if (dayOffset > 0) setDayOffset(o => o - 1) }} style={{ ...bBase, padding: '6px 12px', opacity: dayOffset === 0 ? 0.3 : 1, cursor: dayOffset === 0 ? 'default' : 'pointer', fontSize: '16px' }}>←</button>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  {weekDates.map((date, idx) => {
+                  {weekDates.slice(0, 7).map((date, idx) => {
                     const ds = getDateStr(date), isVisible = idx >= dayOffset && idx < dayOffset + daysToShow, isT = ds === todayStr
                     return (
-                      <button key={ds} onClick={() => { if (idx < daysToShow) setDayOffset(0); else setDayOffset(Math.min(idx, maxOff)) }} style={{
+                      <button key={ds} onClick={() => setDayOffset(Math.min(idx, maxOff))} style={{
                         width: '38px', height: '38px',
                         backgroundColor: isVisible ? (isT ? T.accent : T.accentGlow) : 'transparent',
                         border: isVisible ? 'none' : '1px solid ' + T.borderSubtle, borderRadius: '6px',
@@ -634,6 +666,7 @@ function Planner({ session }) {
           mission={editingMission}
           onSave={updateMission}
           onClose={() => setEditingMission(null)}
+          quests={activeQuests}
         />
       )}
     </div>

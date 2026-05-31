@@ -36,6 +36,7 @@ export function rowToItem(row) {
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     starred: !!row.starred,
+    notes: row.notes || '',
   }
 }
 

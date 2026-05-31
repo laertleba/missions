@@ -34,7 +34,7 @@ function metaLabel(m) {
   return parts.join(' · ')
 }
 
-function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted }) {
+function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted, dragCtx }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -52,6 +52,9 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
   const fs = isMobile ? '12px' : '13.5px'
   const pad = isMobile ? '6px 8px' : '8px 10px'
 
+  const isDragging = dragCtx?.dragging?.id === mission.id
+  const isDragOver = dragCtx?.dragOverId === mission.id
+
   function submitSub() {
     const t = draft.trim()
     if (!t) return
@@ -60,7 +63,15 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div
+      style={{ position: 'relative', opacity: isDragging ? 0.4 : 1 }}
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); dragCtx?.onDragOver(mission.id) }}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); dragCtx?.onDropOn(mission) }}
+    >
+      {/* Drop indicator line */}
+      {isDragOver && (
+        <div style={{ height: '2px', backgroundColor: T.accent, borderRadius: '2px', marginBottom: '2px', boxShadow: T.textGlow }} />
+      )}
       <div
         style={{
           display: 'flex',
@@ -74,6 +85,20 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           transition: 'all ' + T.trF,
         }}
       >
+        {/* Drag handle */}
+        <span
+          draggable
+          onDragStart={e => { e.stopPropagation(); dragCtx?.onDragStart(mission) }}
+          onDragEnd={() => dragCtx?.onDragEnd()}
+          title="Drag to reorder"
+          style={{
+            flexShrink: 0, marginTop: '3px',
+            color: T.textMuted, cursor: 'grab',
+            fontSize: '11px', lineHeight: 1,
+            userSelect: 'none', opacity: 0.5,
+          }}
+        >⠿</span>
+
         {/* Collapse toggle */}
         <button
           onClick={() => hasKids && onToggleCollapse(mission.id)}
@@ -91,7 +116,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
 
         <Chk done={done} onClick={() => handlers.onToggle(mission)} size={isMobile ? 16 : 18} />
 
-        {/* Title + quest label (take all remaining width) */}
+        {/* Title + quest label */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span
             onClick={() => handlers.onEdit && handlers.onEdit(mission)}
@@ -108,82 +133,33 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
             {mission.title}
           </span>
           {questLabel && (
-            <span style={{
-              fontSize: '9px', color: T.textMuted,
-              fontFamily: T.fontMono, letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-            }}>
+            <span style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               ▸ {questLabel}
             </span>
           )}
         </div>
 
         {meta && (
-          <span style={{
-            fontSize: isMobile ? '9px' : '10px', color: T.textMuted,
-            fontFamily: T.fontMono, whiteSpace: 'nowrap',
-            flexShrink: 0, marginTop: '2px',
-          }}>
+          <span style={{ fontSize: isMobile ? '9px' : '10px', color: T.textMuted, fontFamily: T.fontMono, whiteSpace: 'nowrap', flexShrink: 0, marginTop: '2px' }}>
             {meta}
           </span>
         )}
 
-        {/* Add to my day */}
         {handlers.onToday && (
-          <button
-            onClick={() => handlers.onToday(mission)}
-            title="Add to my day"
-            style={{
-              flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-              color: isToday ? T.accent : T.textMuted,
-              cursor: 'pointer', fontSize: isMobile ? '13px' : '14px',
-              lineHeight: '1', padding: '0 1px',
-              textShadow: isToday ? T.textGlow : 'none',
-              transition: 'color ' + T.trF,
-            }}
-          >⊕</button>
+          <button onClick={() => handlers.onToday(mission)} title="Add to my day" style={{ flexShrink: 0, backgroundColor: 'transparent', border: 'none', color: isToday ? T.accent : T.textMuted, cursor: 'pointer', fontSize: isMobile ? '13px' : '14px', lineHeight: '1', padding: '0 1px', textShadow: isToday ? T.textGlow : 'none', transition: 'color ' + T.trF }}>⊕</button>
         )}
 
-        {/* Star */}
-        <button
-          onClick={() => handlers.onStar && handlers.onStar(mission)}
-          title={starred ? 'Unstar' : 'Mark as important'}
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-            color: starred ? T.amber : T.textMuted,
-            cursor: 'pointer', fontSize: isMobile ? '13px' : '14px',
-            lineHeight: '1', padding: '0 1px',
-            textShadow: starred ? '0 0 6px rgba(255,179,64,0.55)' : 'none',
-            transition: 'color ' + T.trF,
-          }}
-        >{starred ? '★' : '☆'}</button>
+        <button onClick={() => handlers.onStar && handlers.onStar(mission)} title={starred ? 'Unstar' : 'Mark as important'} style={{ flexShrink: 0, backgroundColor: 'transparent', border: 'none', color: starred ? T.amber : T.textMuted, cursor: 'pointer', fontSize: isMobile ? '13px' : '14px', lineHeight: '1', padding: '0 1px', textShadow: starred ? '0 0 6px rgba(255,179,64,0.55)' : 'none', transition: 'color ' + T.trF }}>{starred ? '★' : '☆'}</button>
 
-        {/* Add sub-mission */}
-        <button
-          onClick={() => setAdding(a => !a)}
-          title="Add sub-mission"
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent',
-            border: '1px solid ' + T.borderSubtle, borderRadius: '4px',
-            color: T.textSecondary, cursor: 'pointer',
-            fontSize: '10px', fontFamily: T.fontMono,
-            padding: '1px 5px', lineHeight: '1.4',
-          }}
-        >+↳</button>
+        <button onClick={() => setAdding(a => !a)} title="Add sub-mission" style={{ flexShrink: 0, backgroundColor: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textSecondary, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '1px 5px', lineHeight: '1.4' }}>+↳</button>
 
         <button
           onClick={() => {
             const kidsCount = (childrenByParent[mission.id] || []).length
-            const msg = kidsCount
-              ? `Delete "${mission.title}" and its ${kidsCount} sub-mission(s)?`
-              : `Delete "${mission.title}"?`
+            const msg = kidsCount ? `Delete "${mission.title}" and its ${kidsCount} sub-mission(s)?` : `Delete "${mission.title}"?`
             if (window.confirm(msg)) handlers.onDelete(mission)
           }}
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-            color: T.textMuted, cursor: 'pointer',
-            fontSize: isMobile ? '13px' : '14px', lineHeight: '1', padding: '0 2px',
-          }}
+          style={{ flexShrink: 0, backgroundColor: 'transparent', border: 'none', color: T.textMuted, cursor: 'pointer', fontSize: isMobile ? '13px' : '14px', lineHeight: '1', padding: '0 2px' }}
         >×</button>
       </div>
 
@@ -194,16 +170,9 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') submitSub(); if (e.key === 'Escape') { setAdding(false); setDraft('') } }}
             placeholder="New sub-mission…"
-            style={{
-              flex: 1, backgroundColor: T.bgInput,
-              border: '1px solid ' + T.accentMuted, borderRadius: '4px',
-              padding: '6px 9px', color: T.textPrimary,
-              fontSize: '12px', fontFamily: T.fontMono, outline: 'none',
-            }}
+            style={{ flex: 1, backgroundColor: T.bgInput, border: '1px solid ' + T.accentMuted, borderRadius: '4px', padding: '6px 9px', color: T.textPrimary, fontSize: '12px', fontFamily: T.fontMono, outline: 'none' }}
           />
-          <button onClick={submitSub} style={{ backgroundColor: T.accent, border: 'none', borderRadius: '4px', padding: '0 12px', color: '#06140b', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-            Add
-          </button>
+          <button onClick={submitSub} style={{ backgroundColor: T.accent, border: 'none', borderRadius: '4px', padding: '0 12px', color: '#06140b', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Add</button>
         </div>
       )}
 
@@ -212,7 +181,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           <div style={{ overflow: 'hidden' }}>
             <div style={{ marginLeft: isMobile ? '10px' : '14px', paddingLeft: isMobile ? '8px' : '14px', borderLeft: '1px solid ' + T.borderSubtle, marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {kids.map(child => (
-                <MissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
+                <MissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} dragCtx={dragCtx} />
               ))}
             </div>
           </div>
@@ -224,9 +193,35 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
 
 export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels, deprioritizeCompleted }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
+  const [dragging, setDragging] = useState(null)
+  const [dragOverId, setDragOverId] = useState(null)
 
   function onToggleCollapse(id) {
     setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+
+  function handleDropOn(targetMission) {
+    if (!dragging || dragging.id === targetMission.id) { reset(); return }
+    if (dragging.parentId !== targetMission.parentId) { reset(); return }
+
+    const siblings = childrenByParent[dragging.parentId] || []
+    const without = siblings.filter(s => s.id !== dragging.id)
+    const tIdx = without.findIndex(s => s.id === targetMission.id)
+    if (tIdx === -1) { reset(); return }
+
+    const reordered = [...without.slice(0, tIdx), dragging, ...without.slice(tIdx)]
+    handlers.onReorder && handlers.onReorder(dragging.parentId, reordered.map(s => s.id))
+    reset()
+  }
+
+  function reset() { setDragging(null); setDragOverId(null) }
+
+  const dragCtx = {
+    dragging, dragOverId,
+    onDragStart: m => setDragging(m),
+    onDragOver: id => setDragOverId(id),
+    onDropOn: handleDropOn,
+    onDragEnd: reset,
   }
 
   const sortedTopLevel = deprioritizeCompleted
@@ -242,7 +237,10 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+      onDragLeave={() => setDragOverId(null)}
+    >
       {sortedTopLevel.map(m => (
         <MissionNode
           key={m.id}
@@ -255,6 +253,7 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
           handlers={handlers}
           isMobile={isMobile}
           deprioritizeCompleted={deprioritizeCompleted}
+          dragCtx={dragCtx}
         />
       ))}
     </div>

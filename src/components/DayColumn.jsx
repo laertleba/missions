@@ -1,23 +1,21 @@
 import { T } from '../lib/theme'
-import TaskCard from './TaskCard'
+import MissionTree from './MissionTree'
 
 export default function DayColumn({
-  dateString, date, isToday, isWeekend, dayTasks,
-  expandedTask, dragOverTaskId, draggedItem, isMobile,
-  onExpand, onToggle, onDelete,
-  onUpdateText, onUpdateStart, onUpdateDur, onMove,
-  onDragStart, onDragEnd, onSetDragOver, onDropOnDay, onDropOnTask,
+  dateString, date, isToday, isWeekend, dayTasks, isMobile,
+  childrenByParent, questsById, missionHandlers,
 }) {
   const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
   const dateDisp = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const tasks = dayTasks || []
 
-  const sharedTaskProps = {
-    isMobile, expandedTask, showTime: false,
-    onExpand, onToggle, onDelete,
-    onUpdateText, onUpdateStart, onUpdateDur, onMove,
-    onDragStart, onDragEnd, onSetDragOver, onDropOnTask,
-  }
+  // Root missions for this day: missions whose parent is not also in this day's list.
+  // Top-level missions (parent = quest) are always roots; sub-missions only become
+  // roots if their parent isn't scheduled for the same day.
+  const dayTaskIds = new Set(tasks.map(t => t.id))
+  const rootMissions = tasks.filter(t => !dayTaskIds.has(t.parentId))
+
+  const questLabels = new Map(rootMissions.map(m => [m.id, questsById?.[m.questId]?.title || '']))
 
   return (
     <div
@@ -32,8 +30,6 @@ export default function DayColumn({
         overflow: 'hidden',
         minWidth: 0,
       }}
-      onDragOver={e => e.preventDefault()}
-      onDrop={e => { e.preventDefault(); onDropOnDay(dateString) }}
     >
       <h2 style={{
         fontSize: isMobile ? '16px' : '15px',
@@ -49,24 +45,14 @@ export default function DayColumn({
         {dateDisp}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '6px' : '8px' }}>
-        {tasks.length === 0 && (
-          <div style={{ fontSize: isMobile ? '10px' : '11px', color: T.textMuted, fontFamily: T.fontMono, padding: '8px 0', opacity: 0.6 }}>
-            No missions
-          </div>
-        )}
-        {tasks.map(task => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            dateString={dateString}
-            expanded={expandedTask === task.id}
-            isDragOver={dragOverTaskId === task.id}
-            isDragging={draggedItem && draggedItem.task.id === task.id}
-            {...sharedTaskProps}
-          />
-        ))}
-      </div>
+      <MissionTree
+        topLevel={rootMissions}
+        childrenByParent={childrenByParent}
+        handlers={missionHandlers}
+        isMobile={isMobile}
+        questLabels={questLabels}
+        emptyMessage="No missions"
+      />
     </div>
   )
 }

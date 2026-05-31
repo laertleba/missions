@@ -20,8 +20,9 @@ export default function MissionsView({
   }, [activeQuests]) // eslint-disable-line
 
   // All top-level missions across active quests, sorted: starred first → scheduled date asc (nulls last) → createdAt asc
+  // Completed root missions are hidden; completed children remain visible under active parents.
   const allTopLevel = useMemo(() => {
-    const missions = activeQuests.flatMap(q => childrenByParent[q.id] || [])
+    const missions = activeQuests.flatMap(q => childrenByParent[q.id] || []).filter(m => !m.completed)
     return [...missions].sort((a, b) => {
       if (a.starred !== b.starred) return a.starred ? -1 : 1
       if (a.scheduledDate && b.scheduledDate) return a.scheduledDate < b.scheduledDate ? -1 : 1

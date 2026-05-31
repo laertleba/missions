@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { T } from '../lib/theme'
-import { fmtTime } from '../lib/utils'
+import { fmtTime, getDateStr } from '../lib/utils'
 
 function Chk({ done, onClick, size = 18 }) {
   return (
@@ -34,16 +34,21 @@ function metaLabel(m) {
   return parts.join(' · ')
 }
 
-function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile }) {
+function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
-  const kids = childrenByParent[mission.id] || []
+  const kidsRaw = childrenByParent[mission.id] || []
+  const kids = deprioritizeCompleted
+    ? [...kidsRaw].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1))
+    : kidsRaw
   const hasKids = kids.length > 0
   const isOpen = !collapsed.has(mission.id)
   const done = mission.completed
   const starred = !!mission.starred
   const meta = metaLabel(mission)
+  const todayStr = getDateStr(new Date())
+  const isToday = mission.scheduledDate === todayStr
   const fs = isMobile ? '12px' : '13.5px'
   const pad = isMobile ? '6px 8px' : '8px 10px'
 
@@ -125,6 +130,23 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           </span>
         )}
 
+        {/* Add to my day */}
+        {handlers.onToday && (
+          <button
+            onClick={() => handlers.onToday(mission)}
+            title="Add to my day"
+            style={{
+              flexShrink: 0, backgroundColor: 'transparent', border: 'none',
+              color: isToday ? T.accent : T.textMuted,
+              cursor: 'pointer',
+              fontSize: isMobile ? '13px' : '14px',
+              lineHeight: '1', padding: '0 1px',
+              textShadow: isToday ? T.textGlow : 'none',
+              transition: 'color ' + T.trF,
+            }}
+          >⊕</button>
+        )}
+
         {/* Star */}
         <button
           onClick={() => handlers.onStar && handlers.onStar(mission)}
@@ -140,26 +162,24 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           }}
         >{starred ? '★' : '☆'}</button>
 
-        {/* Add sub-mission (desktop only) */}
-        {!isMobile && (
-          <button
-            onClick={() => setAdding(a => !a)}
-            title="Add sub-mission"
-            style={{
-              flexShrink: 0, backgroundColor: 'transparent',
-              border: '1px solid ' + T.borderSubtle, borderRadius: '4px',
-              color: T.textSecondary, cursor: 'pointer',
-              fontSize: '10px', fontFamily: T.fontMono,
-              padding: '1px 5px', lineHeight: '1.4',
-            }}
-          >+↳</button>
-        )}
+        {/* Add sub-mission — shown on all screen sizes */}
+        <button
+          onClick={() => setAdding(a => !a)}
+          title="Add sub-mission"
+          style={{
+            flexShrink: 0, backgroundColor: 'transparent',
+            border: '1px solid ' + T.borderSubtle, borderRadius: '4px',
+            color: T.textSecondary, cursor: 'pointer',
+            fontSize: '10px', fontFamily: T.fontMono,
+            padding: '1px 5px', lineHeight: '1.4',
+          }}
+        >+↳</button>
 
         <button
           onClick={() => {
-            const kids = childrenByParent[mission.id] || []
-            const msg = kids.length
-              ? `Delete "${mission.title}" and its ${kids.length} sub-mission(s)?`
+            const kidsCount = (childrenByParent[mission.id] || []).length
+            const msg = kidsCount
+              ? `Delete "${mission.title}" and its ${kidsCount} sub-mission(s)?`
               : `Delete "${mission.title}"?`
             if (window.confirm(msg)) handlers.onDelete(mission)
           }}
@@ -196,7 +216,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           <div style={{ overflow: 'hidden' }}>
             <div style={{ marginLeft: isMobile ? '10px' : '14px', paddingLeft: isMobile ? '8px' : '14px', borderLeft: '1px solid ' + T.borderSubtle, marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {kids.map(child => (
-                <MissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} />
+                <MissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
               ))}
             </div>
           </div>
@@ -206,14 +226,18 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
   )
 }
 
-export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels }) {
+export default function MissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels, deprioritizeCompleted }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
 
   function onToggleCollapse(id) {
     setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
 
-  if (topLevel.length === 0) {
+  const sortedTopLevel = deprioritizeCompleted
+    ? [...topLevel].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1))
+    : topLevel
+
+  if (sortedTopLevel.length === 0) {
     return (
       <div style={{ padding: '24px 12px', color: T.textMuted, fontSize: isMobile ? '11px' : '13px', fontFamily: T.fontMono, textAlign: 'center' }}>
         {emptyMessage || 'No missions logged. Add the first objective above.'}
@@ -223,7 +247,7 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {topLevel.map(m => (
+      {sortedTopLevel.map(m => (
         <MissionNode
           key={m.id}
           mission={m}
@@ -234,6 +258,7 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
           depth={0}
           handlers={handlers}
           isMobile={isMobile}
+          deprioritizeCompleted={deprioritizeCompleted}
         />
       ))}
     </div>

@@ -89,6 +89,7 @@ function Planner({ session }) {
   // ── Derivations ──
   const quests = useMemo(() => items.filter(i => i.type === 'quest'), [items])
   const activeQuests = useMemo(() => quests.filter(q => !q.archived), [quests])
+  const questsById = useMemo(() => Object.fromEntries(quests.map(q => [q.id, q])), [quests])
 
   const childrenByParent = useMemo(() => {
     const m = {}
@@ -212,6 +213,12 @@ function Planner({ session }) {
     const newStarred = !item.starred
     setItems(prev => prev.map(it => it.id === item.id ? { ...it, starred: newStarred } : it))
     await runWrite(supabase.from('items').update({ starred: newStarred }).eq('id', item.id))
+  }
+
+  async function setMissionToday(item) {
+    const today = getDateStr(new Date())
+    setItems(prev => prev.map(it => it.id === item.id ? { ...it, scheduledDate: today } : it))
+    await runWrite(supabase.from('items').update({ scheduled_date: today }).eq('id', item.id))
   }
 
   // ── Mission CRUD ──
@@ -438,6 +445,7 @@ function Planner({ session }) {
     onAddSub: addSubMission,
     onEdit: setEditingMission,
     onStar: toggleStar,
+    onToday: setMissionToday,
   }
 
   // ── Sync indicator ──
@@ -446,13 +454,10 @@ function Planner({ session }) {
 
   // ── Shared DayColumn props ──
   const dcp = {
-    expandedTask: expTask, dragOverTaskId: dragOverId, draggedItem: dragItem, isMobile: mob,
-    onExpand: setExpTask,
-    onToggle: (_ds, id) => toggleComplete(items.find(i => i.id === id)),
-    onDelete: (_ds, id) => deleteItem(items.find(i => i.id === id)),
-    onUpdateText: updateText, onUpdateStart: updateStart, onUpdateDur: updateDuration, onMove: moveTask,
-    onDragStart, onDragEnd, onSetDragOver: setDragOverId,
-    onDropOnDay: ds => handleDrop(ds), onDropOnTask: (ds, tid) => handleDrop(ds, tid),
+    isMobile: mob,
+    childrenByParent,
+    questsById,
+    missionHandlers,
   }
 
   const bBase = { backgroundColor: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: T.rSm, color: T.textSecondary, cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono }

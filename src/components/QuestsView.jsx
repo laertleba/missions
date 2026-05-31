@@ -15,7 +15,8 @@ export default function QuestsView({
   const titleInputRef = useRef(null)
 
   const visibleQuests = quests.filter(q => (questFilter === 'archived' ? q.archived : !q.archived))
-  const selected = quests.find(q => q.id === selectedQuestId) || null
+  // Only treat a quest as selected if it belongs to the current filter tab
+  const selected = quests.find(q => q.id === selectedQuestId && (questFilter === 'archived' ? !!q.archived : !q.archived)) || null
   const topLevel = selected ? childrenByParent[selected.id] || [] : []
 
   // Focus title input when editing starts
@@ -227,7 +228,7 @@ export default function QuestsView({
             </div>
           )}
 
-          <MissionTree topLevel={topLevel} childrenByParent={childrenByParent} handlers={missionHandlers} isMobile={isMobile} />
+          <MissionTree topLevel={topLevel} childrenByParent={childrenByParent} handlers={missionHandlers} isMobile={isMobile} deprioritizeCompleted />
         </>
       )}
     </div>

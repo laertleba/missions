@@ -16,6 +16,7 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
   const [duration, setDuration] = useState(mission.duration || 30)
   const [notes, setNotes] = useState(mission.notes || '')
   const [questId, setQuestId] = useState(mission.questId || '')
+  const [expanded, setExpanded] = useState(false)
 
   // Only top-level missions (parentId === questId) can be moved to another quest
   const isTopLevel = mission.parentId === mission.questId
@@ -69,73 +70,86 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
           border: '1px solid ' + T.accentMuted,
           borderRadius: T.rMd,
           padding: '24px',
-          maxWidth: '460px',
-          width: '100%',
+          ...(expanded
+            ? { width: '96vw', maxWidth: '96vw', height: '92vh', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }
+            : { maxWidth: '460px', width: '100%' }),
           boxShadow: T.shGlow,
+          transition: 'width 0.18s, height 0.18s',
         }}
       >
-        <h3 style={{ margin: '0 0 18px 0', fontSize: '13px', color: T.accent, fontFamily: T.fontMono, letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: T.textGlow }}>
-          ▌ Edit Mission
-        </h3>
-
-        <label style={lbl}>Title</label>
-        <input
-          autoFocus
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-          style={{ ...inp, marginBottom: '14px' }}
-        />
-
-        {isTopLevel && activeQuests.length > 1 && (
-          <>
-            <label style={lbl}>Quest</label>
-            <select
-              value={questId}
-              onChange={e => setQuestId(e.target.value)}
-              style={{ ...inp, marginBottom: '14px', cursor: 'pointer' }}
-            >
-              {activeQuests.map(q => (
-                <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
-              ))}
-            </select>
-          </>
-        )}
-
-        <label style={lbl}>Date</label>
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          style={{ ...inp, marginBottom: '14px' }}
-        />
-
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={lbl}>Start time</label>
-            <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={lbl}>Duration (min)</label>
-            <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+          <h3 style={{ margin: 0, fontSize: '13px', color: T.accent, fontFamily: T.fontMono, letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: T.textGlow }}>
+            ▌ Edit Mission
+          </h3>
+          <button
+            onClick={() => setExpanded(x => !x)}
+            title={expanded ? 'Restore' : 'Expand'}
+            style={{ backgroundColor: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '13px', lineHeight: 1, padding: '3px 7px' }}
+          >{expanded ? '⊡' : '⛶'}</button>
         </div>
 
-        <label style={lbl}>Notes</label>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Optional notes…"
-          rows={3}
-          style={{
-            ...inp,
-            marginBottom: '20px',
-            resize: 'vertical',
-            lineHeight: '1.5',
-          }}
-        />
+        {/* scrollable fields area — grows when expanded */}
+        <div style={expanded ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' } : {}}>
+          <label style={lbl}>Title</label>
+          <input
+            autoFocus
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+            style={{ ...inp, marginBottom: '14px' }}
+          />
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+          {isTopLevel && activeQuests.length > 1 && (
+            <>
+              <label style={lbl}>Quest</label>
+              <select
+                value={questId}
+                onChange={e => setQuestId(e.target.value)}
+                style={{ ...inp, marginBottom: '14px', cursor: 'pointer' }}
+              >
+                {activeQuests.map(q => (
+                  <option key={q.id} value={q.id} style={{ backgroundColor: T.bgSurface }}>{q.title}</option>
+                ))}
+              </select>
+            </>
+          )}
+
+          <label style={lbl}>Date</label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            style={{ ...inp, marginBottom: '14px' }}
+          />
+
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={lbl}>Start time</label>
+              <input type="time" value={startStr} onChange={e => setStartStr(e.target.value)} style={inp} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={lbl}>Duration (min)</label>
+              <input type="number" min="5" step="5" value={duration} onChange={e => setDuration(e.target.value)} style={inp} />
+            </div>
+          </div>
+
+          <label style={lbl}>Notes</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Optional notes…"
+            rows={expanded ? undefined : 3}
+            style={{
+              ...inp,
+              marginBottom: '20px',
+              resize: expanded ? 'none' : 'vertical',
+              lineHeight: '1.6',
+              ...(expanded ? { flex: 1, minHeight: 0 } : {}),
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
           <button
             onClick={onClose}
             style={{

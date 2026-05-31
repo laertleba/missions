@@ -1,5 +1,5 @@
 import { T } from '../lib/theme'
-import MissionTree from './MissionTree'
+import DayMissionTree from './DayMissionTree'
 
 export default function DayColumn({
   dateString, date, isToday, isWeekend, dayTasks, isMobile,
@@ -45,7 +45,7 @@ export default function DayColumn({
         {dateDisp}
       </div>
 
-      <MissionTree
+      <DayMissionTree
         topLevel={rootMissions}
         childrenByParent={childrenByParent}
         handlers={missionHandlers}

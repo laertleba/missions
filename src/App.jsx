@@ -217,8 +217,9 @@ function Planner({ session }) {
 
   async function setMissionToday(item) {
     const today = getDateStr(new Date())
-    setItems(prev => prev.map(it => it.id === item.id ? { ...it, scheduledDate: today } : it))
-    await runWrite(supabase.from('items').update({ scheduled_date: today }).eq('id', item.id))
+    const newDate = item.scheduledDate === today ? null : today
+    setItems(prev => prev.map(it => it.id === item.id ? { ...it, scheduledDate: newDate } : it))
+    await runWrite(supabase.from('items').update({ scheduled_date: newDate }).eq('id', item.id))
   }
 
   // ── Mission CRUD ──

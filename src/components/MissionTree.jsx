@@ -34,6 +34,20 @@ function metaLabel(m) {
   return parts.join(' · ')
 }
 
+// Shared styles for action bar buttons
+const abtn = {
+  backgroundColor: 'transparent', border: 'none',
+  cursor: 'pointer', lineHeight: '1', padding: '0 3px',
+  transition: 'color 0.15s ease',
+}
+const abtnBordered = {
+  backgroundColor: 'transparent',
+  border: '1px solid', borderRadius: '4px',
+  cursor: 'pointer', fontSize: '10px',
+  fontFamily: 'ui-monospace,monospace',
+  padding: '1px 5px', lineHeight: '1.4',
+}
+
 function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
@@ -67,9 +81,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           alignItems: 'flex-start',
           gap: isMobile ? '6px' : '8px',
           padding: pad,
-          backgroundColor: starred
-            ? 'rgba(255,179,64,0.06)'
-            : (done ? T.bgInput : T.bgSurfaceAlt),
+          backgroundColor: starred ? 'rgba(255,179,64,0.06)' : (done ? T.bgInput : T.bgSurfaceAlt),
           border: '1px solid ' + (starred ? 'rgba(255,179,64,0.35)' : T.borderSubtle),
           borderRadius: '5px',
           opacity: done ? 0.65 : 1,
@@ -80,7 +92,7 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
         <button
           onClick={() => hasKids && onToggleCollapse(mission.id)}
           style={{
-            width: 14, minWidth: 14, marginTop: '2px',
+            width: 14, minWidth: 14, marginTop: '3px',
             backgroundColor: 'transparent', border: 'none',
             color: hasKids ? T.accent : 'transparent',
             cursor: hasKids ? 'pointer' : 'default',
@@ -93,12 +105,15 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
 
         <Chk done={done} onClick={() => handlers.onToggle(mission)} size={isMobile ? 16 : 18} />
 
-        {/* Title + quest label */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {/* Content column: title → actions row → quest label */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Title — full width, wraps freely */}
           <span
             onClick={() => handlers.onEdit && handlers.onEdit(mission)}
             title="Click to edit"
             style={{
+              display: 'block',
               fontSize: fs,
               color: T.textPrimary,
               textDecoration: done ? 'line-through' : 'none',
@@ -109,8 +124,51 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
           >
             {mission.title}
           </span>
+
+          {/* Actions bar: meta · ⊕ · ★ · +↳ · × */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '5px', flexWrap: 'wrap' }}>
+            {meta && (
+              <span style={{ fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, marginRight: '4px', whiteSpace: 'nowrap' }}>
+                {meta}
+              </span>
+            )}
+
+            {handlers.onToday && (
+              <button
+                onClick={() => handlers.onToday(mission)}
+                title="Add to my day"
+                style={{ ...abtn, fontSize: '13px', color: isToday ? T.accent : T.textMuted, textShadow: isToday ? T.textGlow : 'none' }}
+              >⊕</button>
+            )}
+
+            <button
+              onClick={() => handlers.onStar && handlers.onStar(mission)}
+              title={starred ? 'Unstar' : 'Mark as important'}
+              style={{ ...abtn, fontSize: '13px', color: starred ? T.amber : T.textMuted, textShadow: starred ? '0 0 6px rgba(255,179,64,0.55)' : 'none' }}
+            >{starred ? '★' : '☆'}</button>
+
+            <button
+              onClick={() => setAdding(a => !a)}
+              title="Add sub-mission"
+              style={{ ...abtnBordered, borderColor: T.borderSubtle, color: T.textSecondary }}
+            >+↳</button>
+
+            <button
+              onClick={() => {
+                const kidsCount = (childrenByParent[mission.id] || []).length
+                const msg = kidsCount
+                  ? `Delete "${mission.title}" and its ${kidsCount} sub-mission(s)?`
+                  : `Delete "${mission.title}"?`
+                if (window.confirm(msg)) handlers.onDelete(mission)
+              }}
+              style={{ ...abtn, fontSize: '14px', color: T.textMuted }}
+            >×</button>
+          </div>
+
+          {/* Quest label */}
           {questLabel && (
             <span style={{
+              display: 'block', marginTop: '3px',
               fontSize: '9px', color: T.textMuted,
               fontFamily: T.fontMono, letterSpacing: '0.06em',
               textTransform: 'uppercase',
@@ -119,76 +177,6 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
             </span>
           )}
         </div>
-
-        {meta && (
-          <span style={{
-            fontSize: isMobile ? '9px' : '10px', color: T.textMuted,
-            fontFamily: T.fontMono, whiteSpace: 'nowrap',
-            flexShrink: 0, marginTop: '2px',
-          }}>
-            {meta}
-          </span>
-        )}
-
-        {/* Add to my day */}
-        {handlers.onToday && (
-          <button
-            onClick={() => handlers.onToday(mission)}
-            title="Add to my day"
-            style={{
-              flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-              color: isToday ? T.accent : T.textMuted,
-              cursor: 'pointer',
-              fontSize: isMobile ? '13px' : '14px',
-              lineHeight: '1', padding: '0 1px',
-              textShadow: isToday ? T.textGlow : 'none',
-              transition: 'color ' + T.trF,
-            }}
-          >⊕</button>
-        )}
-
-        {/* Star */}
-        <button
-          onClick={() => handlers.onStar && handlers.onStar(mission)}
-          title={starred ? 'Unstar' : 'Mark as important'}
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-            color: starred ? T.amber : T.textMuted,
-            cursor: 'pointer',
-            fontSize: isMobile ? '13px' : '14px',
-            lineHeight: '1', padding: '0 1px',
-            textShadow: starred ? '0 0 6px rgba(255,179,64,0.55)' : 'none',
-            transition: 'color ' + T.trF,
-          }}
-        >{starred ? '★' : '☆'}</button>
-
-        {/* Add sub-mission — shown on all screen sizes */}
-        <button
-          onClick={() => setAdding(a => !a)}
-          title="Add sub-mission"
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent',
-            border: '1px solid ' + T.borderSubtle, borderRadius: '4px',
-            color: T.textSecondary, cursor: 'pointer',
-            fontSize: '10px', fontFamily: T.fontMono,
-            padding: '1px 5px', lineHeight: '1.4',
-          }}
-        >+↳</button>
-
-        <button
-          onClick={() => {
-            const kidsCount = (childrenByParent[mission.id] || []).length
-            const msg = kidsCount
-              ? `Delete "${mission.title}" and its ${kidsCount} sub-mission(s)?`
-              : `Delete "${mission.title}"?`
-            if (window.confirm(msg)) handlers.onDelete(mission)
-          }}
-          style={{
-            flexShrink: 0, backgroundColor: 'transparent', border: 'none',
-            color: T.textMuted, cursor: 'pointer',
-            fontSize: isMobile ? '13px' : '14px', lineHeight: '1', padding: '0 2px',
-          }}
-        >×</button>
       </div>
 
       {adding && (

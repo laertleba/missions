@@ -17,6 +17,7 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
   const [notes, setNotes] = useState(mission.notes || '')
   const [questId, setQuestId] = useState(mission.questId || '')
   const [expanded, setExpanded] = useState(false)
+  const todayStr = new Date().toISOString().slice(0, 10)
 
   // Only top-level missions (parentId === questId) can be moved to another quest
   const isTopLevel = mission.parentId === mission.questId
@@ -54,7 +55,6 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
         backgroundColor: 'rgba(0,0,0,0.78)',
@@ -113,7 +113,10 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
                 </div>
               )}
               <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-                <label style={lbl}>Date</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <label style={{ ...lbl, marginBottom: 0 }}>Date</label>
+                  <button type="button" onClick={() => setDate(d => d === todayStr ? '' : todayStr)} title="Toggle today" style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0, color: date === todayStr ? T.accent : T.textMuted, textShadow: date === todayStr ? T.textGlow : 'none' }}>⊕</button>
+                </div>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
               </div>
               <div style={{ flex: '1 1 100px', minWidth: 0 }}>
@@ -138,7 +141,10 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
                   </select>
                 </>
               )}
-              <label style={lbl}>Date</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>Date</label>
+                <button type="button" onClick={() => setDate(d => d === todayStr ? '' : todayStr)} title="Toggle today" style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0, color: date === todayStr ? T.accent : T.textMuted, textShadow: date === todayStr ? T.textGlow : 'none' }}>⊕</button>
+              </div>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: '14px' }} />
               <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ flex: 1 }}>

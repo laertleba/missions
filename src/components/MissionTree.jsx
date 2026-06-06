@@ -37,12 +37,18 @@ function metaLabel(m) {
 function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted, dragCtx }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const kidsRaw = childrenByParent[mission.id] || []
-  const kids = deprioritizeCompleted
-    ? [...kidsRaw].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1))
-    : kidsRaw
-  const hasKids = kids.length > 0
+  const incompleteKids = kidsRaw.filter(k => !k.completed)
+  const completedKids = kidsRaw.filter(k => k.completed)
+  const collapseCompleted = completedKids.length > 3 && !showCompleted
+  const kids = collapseCompleted
+    ? incompleteKids
+    : deprioritizeCompleted
+      ? [...incompleteKids, ...completedKids]
+      : kidsRaw
+  const hasKids = kidsRaw.length > 0
   const isOpen = !collapsed.has(mission.id)
   const done = mission.completed
   const starred = !!mission.starred
@@ -185,6 +191,16 @@ function MissionNode({ mission, questLabel, childrenByParent, collapsed, onToggl
               {kids.map(child => (
                 <MissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} dragCtx={dragCtx} />
               ))}
+              {collapseCompleted && (
+                <button onClick={() => setShowCompleted(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+                  ▸ {completedKids.length} completed
+                </button>
+              )}
+              {!collapseCompleted && completedKids.length > 3 && (
+                <button onClick={() => setShowCompleted(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+                  ▾ Hide completed
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -197,6 +213,7 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
   const [collapsed, setCollapsed] = useState(() => new Set())
   const [dragging, setDragging] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
+  const [showCompletedTop, setShowCompletedTop] = useState(false)
 
   function onToggleCollapse(id) {
     setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -227,11 +244,16 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
     onDragEnd: reset,
   } : null
 
-  const sortedTopLevel = deprioritizeCompleted
-    ? [...topLevel].sort((a, b) => (a.completed === b.completed ? 0 : a.completed ? 1 : -1))
-    : topLevel
+  const incompleteTop = topLevel.filter(m => !m.completed)
+  const completedTop = topLevel.filter(m => m.completed)
+  const collapseTop = completedTop.length > 3 && !showCompletedTop
+  const sortedTopLevel = collapseTop
+    ? incompleteTop
+    : deprioritizeCompleted
+      ? [...incompleteTop, ...completedTop]
+      : topLevel
 
-  if (sortedTopLevel.length === 0) {
+  if (topLevel.length === 0) {
     return (
       <div style={{ padding: '24px 12px', color: T.textMuted, fontSize: isMobile ? '11px' : '13px', fontFamily: T.fontMono, textAlign: 'center' }}>
         {emptyMessage || 'No missions logged. Add the first objective above.'}
@@ -259,6 +281,16 @@ export default function MissionTree({ topLevel, childrenByParent, handlers, isMo
           dragCtx={dragCtx}
         />
       ))}
+      {collapseTop && (
+        <button onClick={() => setShowCompletedTop(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '11px', fontFamily: T.fontMono, padding: '4px 10px', letterSpacing: '0.05em' }}>
+          ▸ {completedTop.length} completed
+        </button>
+      )}
+      {!collapseTop && completedTop.length > 3 && (
+        <button onClick={() => setShowCompletedTop(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '11px', fontFamily: T.fontMono, padding: '4px 10px', letterSpacing: '0.05em' }}>
+          ▾ Hide completed
+        </button>
+      )}
     </div>
   )
 }

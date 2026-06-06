@@ -8,6 +8,7 @@ import MissionsView from './components/MissionsView'
 import QuestsView from './components/QuestsView'
 import ImportModal from './components/ImportModal'
 import MissionEditModal from './components/MissionEditModal'
+import MissionCreateModal from './components/MissionCreateModal'
 
 const CACHE_KEY = 'missions_items_cache'
 
@@ -37,13 +38,12 @@ function Planner({ session }) {
   const [syncSt, setSyncSt] = useState('syncing')
   const [view, setView] = useState('missions')
   const [weekOff, setWeekOff] = useState(0)
-  // Default dayOffset so today is in the visible 4-day window
-  const [dayOffset, setDayOffset] = useState(() => {
-    const dow = new Date().getDay()
-    return dow === 0 ? 6 : dow - 1 // Mon=0 … Sun=6; no clamp — today is always first
-  })
+  // dayOffset=0 → yesterday is always the first visible column
+  const [dayOffset, setDayOffset] = useState(0)
+  const [weeklyMode, setWeeklyMode] = useState(() => localStorage.getItem('missions_weekly_mode') || 'week')
+  const [createForDate, setCreateForDate] = useState(null) // dateString | null
   const [mob, setMob] = useState(window.innerWidth < 768)
-  const [mobDay, setMobDay] = useState(() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1 })
+  const [mobDay, setMobDay] = useState(1) // index 1 = today (index 0 = yesterday in new array)
   const [dragItem, setDragItem] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
   const [expTask, setExpTask] = useState(null)
@@ -66,6 +66,7 @@ function Planner({ session }) {
 
   // ── Cache ──
   useEffect(() => { localStorage.setItem(CACHE_KEY, JSON.stringify(items)) }, [items])
+  useEffect(() => { localStorage.setItem('missions_weekly_mode', weeklyMode) }, [weeklyMode])
 
   // ── Load + realtime ──
   const loadItems = useCallback(async () => {
@@ -89,6 +90,7 @@ function Planner({ session }) {
   const quests = useMemo(() => items.filter(i => i.type === 'quest'), [items])
   const activeQuests = useMemo(() => quests.filter(q => !q.archived), [quests])
   const questsById = useMemo(() => Object.fromEntries(quests.map(q => [q.id, q])), [quests])
+  const missionsById = useMemo(() => Object.fromEntries(items.filter(i => i.type === 'mission').map(i => [i.id, i])), [items])
 
   const childrenByParent = useMemo(() => {
     const m = {}
@@ -119,19 +121,15 @@ function Planner({ session }) {
 
   function getWeekDates() {
     const t = new Date(); t.setHours(0, 0, 0, 0)
-    const dow = t.getDay()
-    const diff = dow === 0 ? -6 : 1 - dow
-    const start = new Date(t); start.setDate(t.getDate() + diff + weekOff * 7)
-    // 10 days so today can always be the first visible column (Sun + 3 overflow into next week)
+    // Start from yesterday so the first visible column is always today-1
+    const start = new Date(t); start.setDate(t.getDate() - 1 + weekOff * 7)
     return Array.from({ length: 10 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d })
   }
   const weekDates = getWeekDates()
 
   function goToToday() {
     setWeekOff(0)
-    const dow = new Date().getDay()
-    const idx = dow === 0 ? 6 : dow - 1
-    setDayOffset(idx)
+    setDayOffset(0) // index 0 = yesterday, today is index 1 — visible in the window
   }
 
   function nextTime(ds, isToday) {
@@ -223,8 +221,8 @@ function Planner({ session }) {
   }
 
   // ── Mission CRUD ──
-  async function addTopMission(quest, title) {
-    const m = mkMission({ id: crypto.randomUUID(), title, questId: quest.id, parentId: quest.id, sortOrder: nextSiblingSort(quest.id) })
+  async function addTopMission(quest, title, scheduledDate = null) {
+    const m = mkMission({ id: crypto.randomUUID(), title, questId: quest.id, parentId: quest.id, scheduledDate, sortOrder: nextSiblingSort(quest.id) })
     setItems(prev => [...prev, m])
     await runWrite(supabase.from('items').insert(missionInsert(m)))
   }
@@ -232,6 +230,17 @@ function Planner({ session }) {
   async function addTopMissionById(questId, title) {
     const quest = quests.find(q => q.id === questId)
     if (quest) await addTopMission(quest, title)
+  }
+
+  async function addMissionForDate(questId, title, scheduledDate, notes) {
+    const quest = quests.find(q => q.id === questId)
+    if (!quest) return
+    const id = crypto.randomUUID()
+    const m = mkMission({ id, title, questId: quest.id, parentId: quest.id, scheduledDate: scheduledDate || null, sortOrder: nextSiblingSort(quest.id) })
+    setItems(prev => [...prev, m])
+    const row = { ...missionInsert(m) }
+    if (notes) row.notes = notes
+    await runWrite(supabase.from('items').insert(row))
   }
 
   async function addSubMission(parent, title) {
@@ -490,7 +499,9 @@ function Planner({ session }) {
     isMobile: mob,
     childrenByParent,
     questsById,
+    missionsById,
     missionHandlers,
+    onAddForDate: ds => setCreateForDate(ds),
   }
 
   const bBase = { backgroundColor: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: T.rSm, color: T.textSecondary, cursor: 'pointer', fontSize: '12px', fontFamily: T.fontMono }
@@ -575,7 +586,7 @@ function Planner({ session }) {
                     fontFamily: T.fontMono,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', position: 'relative',
                   }}>
-                    <span style={{ fontSize: '11px', fontWeight: '700' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '700' }}>{['S','M','T','W','T','F','S'][date.getDay()]}</span>
                     <span style={{ fontSize: '10px', color: active ? T.accent : T.textMuted }}>{date.getDate()}</span>
                     {isT && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '3px' }} />}
                   </button>
@@ -590,11 +601,12 @@ function Planner({ session }) {
             </div>
           </>
         ) : (() => {
-          const daysToShow = 4, maxOff = weekDates.length - daysToShow
+          const daysToShow = weeklyMode === 'day' ? 1 : 4
+          const maxOff = weekDates.length - daysToShow
           const visibleDates = weekDates.slice(dayOffset, dayOffset + daysToShow)
           return (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center', padding: '10px 12px', backgroundColor: T.bgSurfaceAlt, borderRadius: '8px', maxWidth: '560px', margin: '0 auto 18px auto', border: '1px solid ' + T.borderSubtle }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center', padding: '10px 12px', backgroundColor: T.bgSurfaceAlt, borderRadius: '8px', maxWidth: '600px', margin: '0 auto 18px auto', border: '1px solid ' + T.borderSubtle }}>
                 <button onClick={() => { if (dayOffset > 0) setDayOffset(o => o - 1) }} style={{ ...bBase, padding: '6px 12px', opacity: dayOffset === 0 ? 0.3 : 1, cursor: dayOffset === 0 ? 'default' : 'pointer', fontSize: '16px' }}>←</button>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {weekDates.slice(0, 7).map((date, idx) => {
@@ -609,7 +621,7 @@ function Planner({ session }) {
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
                         position: 'relative', transition: T.trF, boxShadow: isVisible && isT ? T.shGlow : 'none',
                       }}>
-                        <span style={{ fontSize: '9px' }}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][idx]}</span>
+                        <span style={{ fontSize: '9px' }}>{['S','M','T','W','T','F','S'][date.getDay()]}</span>
                         <span style={{ fontSize: '13px' }}>{date.getDate()}</span>
                         {isT && !isVisible && <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: T.accent, position: 'absolute', bottom: '3px' }} />}
                       </button>
@@ -617,8 +629,14 @@ function Planner({ session }) {
                   })}
                 </div>
                 <button onClick={() => { if (dayOffset < maxOff) setDayOffset(o => o + 1) }} style={{ ...bBase, padding: '6px 12px', opacity: dayOffset >= maxOff ? 0.3 : 1, cursor: dayOffset >= maxOff ? 'default' : 'pointer', fontSize: '16px' }}>→</button>
+                {/* Day / Week toggle */}
+                <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid ' + T.borderSubtle, marginLeft: '4px' }}>
+                  {[['day', '1'], ['week', '4']].map(([mode, label]) => (
+                    <button key={mode} onClick={() => setWeeklyMode(mode)} style={{ padding: '5px 10px', backgroundColor: weeklyMode === mode ? T.accentGlow : 'transparent', border: 'none', borderRight: mode === 'day' ? '1px solid ' + T.borderSubtle : 'none', color: weeklyMode === mode ? T.accent : T.textMuted, cursor: 'pointer', fontSize: '11px', fontFamily: T.fontMono, fontWeight: '700', textShadow: weeklyMode === mode ? T.textGlow : 'none' }}>{label}</button>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: '12px', maxWidth: '1600px', margin: '0 auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${daysToShow},minmax(0,1fr))`, gap: '12px', maxWidth: '1600px', margin: '0 auto' }}>
                 {visibleDates.map(date => {
                   const ds = getDateStr(date), dow = date.getDay()
                   return <DayColumn key={ds} dateString={ds} date={date} isToday={ds === todayStr} isWeekend={dow === 0 || dow === 6} dayTasks={missionsByDate[ds] || []} {...dcp} />
@@ -667,6 +685,14 @@ function Planner({ session }) {
           onSave={updateMission}
           onClose={() => setEditingMission(null)}
           quests={activeQuests}
+        />
+      )}
+      {createForDate !== null && (
+        <MissionCreateModal
+          dateString={createForDate}
+          quests={activeQuests}
+          onAdd={addMissionForDate}
+          onClose={() => setCreateForDate(null)}
         />
       )}
     </div>

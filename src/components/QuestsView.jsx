@@ -199,12 +199,16 @@ export default function QuestsView({
             )}
 
             <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-              {selected.archived ? (
+              {editingTitle !== null ? (
+                <button onClick={commitRename} style={actionBtnStyle(T.accent, T.accentGlow, fs.btn)}>✓ Confirm</button>
+              ) : selected.archived ? (
                 <button onClick={() => onReactivateQuest(selected)} style={actionBtnStyle(T.amber, T.amberGlow, fs.btn)}>↺ Reactivate</button>
               ) : (
-                <button onClick={() => onCompleteQuest(selected)} style={actionBtnStyle(T.accent, T.accentGlow, fs.btn)}>✓ Complete</button>
+                <>
+                  <button onClick={() => onCompleteQuest(selected)} style={actionBtnStyle(T.accent, T.accentGlow, fs.btn)}>✓ Complete</button>
+                  <button onClick={() => { if (window.confirm(`Delete quest "${selected.title}" and all its missions?`)) onDeleteQuest(selected) }} style={actionBtnStyle(T.textMuted, 'transparent', fs.btn)}>✕ Delete</button>
+                </>
               )}
-              <button onClick={() => { if (window.confirm(`Delete quest "${selected.title}" and all its missions?`)) onDeleteQuest(selected) }} style={actionBtnStyle(T.textMuted, 'transparent', fs.btn)}>✕ Delete</button>
             </div>
           </div>
 

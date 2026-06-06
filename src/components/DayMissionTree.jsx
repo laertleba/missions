@@ -46,12 +46,21 @@ const abtnBordered = {
   padding: '1px 5px', lineHeight: '1.4',
 }
 
-function DayMissionNode({ mission, questLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile }) {
+function DayMissionNode({ mission, questLabel, parentLabel, childrenByParent, collapsed, onToggleCollapse, depth, handlers, isMobile, deprioritizeCompleted }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
 
-  const kids = childrenByParent[mission.id] || []
-  const hasKids = kids.length > 0
+  const kidsRaw = childrenByParent[mission.id] || []
+  const incompleteKids = kidsRaw.filter(k => !k.completed)
+  const completedKids = kidsRaw.filter(k => k.completed)
+  const collapseCompleted = completedKids.length > 3 && !showCompleted
+  const kids = collapseCompleted
+    ? incompleteKids
+    : deprioritizeCompleted
+      ? [...incompleteKids, ...completedKids]
+      : kidsRaw
+  const hasKids = kidsRaw.length > 0
   const isOpen = !collapsed.has(mission.id)
   const done = mission.completed
   const starred = !!mission.starred
@@ -161,10 +170,16 @@ function DayMissionNode({ mission, questLabel, childrenByParent, collapsed, onTo
             >×</button>
           </div>
 
+          {/* Parent mission label (shown when this is a sub-mission) */}
+          {parentLabel && (
+            <span style={{ display: 'block', marginTop: '3px', fontSize: '9px', color: T.textMuted, fontFamily: T.fontMono, letterSpacing: '0.06em' }}>
+              ↳ {parentLabel}
+            </span>
+          )}
           {/* Quest label */}
           {questLabel && (
             <span style={{
-              display: 'block', marginTop: '3px',
+              display: 'block', marginTop: '2px',
               fontSize: '9px', color: T.textMuted,
               fontFamily: T.fontMono, letterSpacing: '0.06em',
               textTransform: 'uppercase',
@@ -200,8 +215,18 @@ function DayMissionNode({ mission, questLabel, childrenByParent, collapsed, onTo
           <div style={{ overflow: 'hidden' }}>
             <div style={{ marginLeft: isMobile ? '10px' : '12px', paddingLeft: isMobile ? '8px' : '10px', borderLeft: '1px solid ' + T.borderSubtle, marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {kids.map(child => (
-                <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} />
+                <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
               ))}
+              {collapseCompleted && (
+                <button onClick={() => setShowCompleted(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+                  ▸ {completedKids.length} completed
+                </button>
+              )}
+              {!collapseCompleted && completedKids.length > 3 && (
+                <button onClick={() => setShowCompleted(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+                  ▾ Hide completed
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -210,12 +235,22 @@ function DayMissionNode({ mission, questLabel, childrenByParent, collapsed, onTo
   )
 }
 
-export default function DayMissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels }) {
+export default function DayMissionTree({ topLevel, childrenByParent, handlers, isMobile = false, emptyMessage, questLabels, parentLabels, deprioritizeCompleted }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
+  const [showCompletedTop, setShowCompletedTop] = useState(false)
 
   function onToggleCollapse(id) {
     setCollapsed(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
+
+  const incompleteTop = topLevel.filter(m => !m.completed)
+  const completedTop = topLevel.filter(m => m.completed)
+  const collapseTop = completedTop.length > 3 && !showCompletedTop
+  const visibleTop = collapseTop
+    ? incompleteTop
+    : deprioritizeCompleted
+      ? [...incompleteTop, ...completedTop]
+      : topLevel
 
   if (topLevel.length === 0) {
     return (
@@ -227,19 +262,31 @@ export default function DayMissionTree({ topLevel, childrenByParent, handlers, i
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {topLevel.map(m => (
+      {visibleTop.map(m => (
         <DayMissionNode
           key={m.id}
           mission={m}
           questLabel={questLabels ? questLabels.get(m.id) : undefined}
+          parentLabel={parentLabels ? parentLabels.get(m.id) : undefined}
           childrenByParent={childrenByParent}
           collapsed={collapsed}
           onToggleCollapse={onToggleCollapse}
           depth={0}
           handlers={handlers}
           isMobile={isMobile}
+          deprioritizeCompleted={deprioritizeCompleted}
         />
       ))}
+      {collapseTop && (
+        <button onClick={() => setShowCompletedTop(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+          ▸ {completedTop.length} completed
+        </button>
+      )}
+      {!collapseTop && completedTop.length > 3 && (
+        <button onClick={() => setShowCompletedTop(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+          ▾ Hide completed
+        </button>
+      )}
     </div>
   )
 }

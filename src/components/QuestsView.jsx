@@ -10,6 +10,7 @@ export default function QuestsView({
 }) {
   const [questDraft, setQuestDraft] = useState('')
   const [missionDraft, setMissionDraft] = useState('')
+  const [addToToday, setAddToToday] = useState(false)
   // Inline quest rename state
   const [editingTitle, setEditingTitle] = useState(null) // null | string
   const titleInputRef = useRef(null)
@@ -30,7 +31,8 @@ export default function QuestsView({
   }
   function submitMission() {
     const t = missionDraft.trim(); if (!t || !selected) return
-    onAddTopMission(selected, t); setMissionDraft('')
+    const scheduledDate = addToToday ? new Date().toISOString().slice(0, 10) : null
+    onAddTopMission(selected, t, scheduledDate); setMissionDraft('')
   }
   function commitRename() {
     if (editingTitle !== null && editingTitle.trim() && selected) {
@@ -228,6 +230,7 @@ export default function QuestsView({
                   fontFamily: T.fontMono, outline: 'none',
                 }}
               />
+              <button onClick={() => setAddToToday(x => !x)} title="Add to today" style={{ flexShrink: 0, backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 4px', color: addToToday ? T.accent : T.textMuted, textShadow: addToToday ? T.textGlow : 'none', transition: 'color 0.15s' }}>⊕</button>
               <button onClick={submitMission} style={{ backgroundColor: T.accent, border: 'none', borderRadius: '4px', padding: '0 14px', color: '#06140b', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>+</button>
             </div>
           )}

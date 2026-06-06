@@ -36,7 +36,7 @@ function Planner({ session }) {
     catch { return [] }
   })
   const [syncSt, setSyncSt] = useState('syncing')
-  const [view, setView] = useState('missions')
+  const [view, setView] = useState(() => localStorage.getItem('missions_view') || 'missions')
   const [weekOff, setWeekOff] = useState(0)
   // dayOffset=0 → yesterday is always the first visible column
   const [dayOffset, setDayOffset] = useState(0)
@@ -67,6 +67,7 @@ function Planner({ session }) {
   // ── Cache ──
   useEffect(() => { localStorage.setItem(CACHE_KEY, JSON.stringify(items)) }, [items])
   useEffect(() => { localStorage.setItem('missions_weekly_mode', weeklyMode) }, [weeklyMode])
+  useEffect(() => { localStorage.setItem('missions_view', view) }, [view])
 
   // ── Load + realtime ──
   const loadItems = useCallback(async () => {
@@ -227,9 +228,9 @@ function Planner({ session }) {
     await runWrite(supabase.from('items').insert(missionInsert(m)))
   }
 
-  async function addTopMissionById(questId, title) {
+  async function addTopMissionById(questId, title, scheduledDate) {
     const quest = quests.find(q => q.id === questId)
-    if (quest) await addTopMission(quest, title)
+    if (quest) await addTopMission(quest, title, scheduledDate)
   }
 
   async function addMissionForDate(questId, title, scheduledDate, notes) {
@@ -632,7 +633,7 @@ function Planner({ session }) {
                 {/* Day / Week toggle */}
                 <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid ' + T.borderSubtle, marginLeft: '4px' }}>
                   {[['day', '1'], ['week', '4']].map(([mode, label]) => (
-                    <button key={mode} onClick={() => setWeeklyMode(mode)} style={{ padding: '5px 10px', backgroundColor: weeklyMode === mode ? T.accentGlow : 'transparent', border: 'none', borderRight: mode === 'day' ? '1px solid ' + T.borderSubtle : 'none', color: weeklyMode === mode ? T.accent : T.textMuted, cursor: 'pointer', fontSize: '11px', fontFamily: T.fontMono, fontWeight: '700', textShadow: weeklyMode === mode ? T.textGlow : 'none' }}>{label}</button>
+                    <button key={mode} onClick={() => { setWeeklyMode(mode); setDayOffset(mode === 'day' ? 1 : 0) }} style={{ padding: '5px 10px', backgroundColor: weeklyMode === mode ? T.accentGlow : 'transparent', border: 'none', borderRight: mode === 'day' ? '1px solid ' + T.borderSubtle : 'none', color: weeklyMode === mode ? T.accent : T.textMuted, cursor: 'pointer', fontSize: '11px', fontFamily: T.fontMono, fontWeight: '700', textShadow: weeklyMode === mode ? T.textGlow : 'none' }}>{label}</button>
                   ))}
                 </div>
               </div>

@@ -11,6 +11,7 @@ export default function MissionsView({
 
   const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id || null)
   const [draft, setDraft] = useState('')
+  const [addToToday, setAddToToday] = useState(false)
 
   // Keep selectedQuestId in sync if the chosen quest gets archived/deleted
   useEffect(() => {
@@ -45,7 +46,8 @@ export default function MissionsView({
   function submit() {
     const t = draft.trim()
     if (!t || !selectedQuestId) return
-    onAddMission(selectedQuestId, t)
+    const scheduledDate = addToToday ? new Date().toISOString().slice(0, 10) : null
+    onAddMission(selectedQuestId, t, scheduledDate)
     setDraft('')
   }
 
@@ -110,6 +112,11 @@ export default function MissionsView({
                   placeholder="New mission…"
                   style={inpStyle}
                 />
+                <button
+                  onClick={() => setAddToToday(x => !x)}
+                  title="Add to today"
+                  style={{ flexShrink: 0, backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 4px', color: addToToday ? T.accent : T.textMuted, textShadow: addToToday ? T.textGlow : 'none', transition: 'color 0.15s' }}
+                >⊕</button>
                 <button
                   onClick={submit}
                   disabled={!draft.trim() || !selectedQuestId}

@@ -1,44 +1,47 @@
 // ════════════════════════════════════════════════════════════
 //  Pip-Boy phosphor terminal palette
-//  Near-black CRT base, phosphor-green primary, amber sparing.
+//  Values resolve to CSS variables (defined in index.css) so the
+//  whole palette can swap between dark (default) and light mode
+//  by toggling [data-theme="light"] on <html>. Inline styles read
+//  these var() strings directly — no component changes needed.
 // ════════════════════════════════════════════════════════════
 export const T = {
-  // Surfaces — near-black with a faint green cast
-  bgDeep: '#070b07',
-  bgSurface: '#0c120c',
-  bgSurfaceAlt: '#101810',
-  bgInput: '#080d08',
-  bgWeekend: '#0a0f0a',
-  bgToday: '#0c160c',
+  // Surfaces
+  bgDeep: 'var(--c-bg-deep)',
+  bgSurface: 'var(--c-bg-surface)',
+  bgSurfaceAlt: 'var(--c-bg-surface-alt)',
+  bgInput: 'var(--c-bg-input)',
+  bgWeekend: 'var(--c-bg-weekend)',
+  bgToday: 'var(--c-bg-today)',
 
   // Borders
-  borderSubtle: '#1a2c1a',
-  borderActive: '#2bff88',
+  borderSubtle: 'var(--c-border-subtle)',
+  borderActive: 'var(--c-border-active)',
 
-  // Text — phosphor greens, readable
-  textPrimary: '#b8f5c8',
-  textSecondary: '#5fa873',
-  textMuted: '#3c6b48',
+  // Text
+  textPrimary: 'var(--c-text-primary)',
+  textSecondary: 'var(--c-text-secondary)',
+  textMuted: 'var(--c-text-muted)',
 
-  // Accent — classic CRT phosphor green
-  accent: '#2bff88',
-  accentMuted: '#1aa856',
-  accentGlow: 'rgba(43,255,136,0.14)',
-  accentDim: 'rgba(43,255,136,0.06)',
+  // Accent — phosphor green
+  accent: 'var(--c-accent)',
+  accentMuted: 'var(--c-accent-muted)',
+  accentGlow: 'var(--c-accent-glow)',
+  accentDim: 'var(--c-accent-dim)',
 
-  // Secondary — amber, used sparingly for highlights/warnings
-  amber: '#ffb340',
-  amberGlow: 'rgba(255,179,64,0.14)',
+  // Secondary — amber, used sparingly
+  amber: 'var(--c-amber)',
+  amberGlow: 'var(--c-amber-glow)',
 
   // Radii
   rSm: '4px',
   rMd: '6px',
 
   // Shadows / glows
-  shCard: '0 1px 3px rgba(0,0,0,0.5)',
-  shHover: '0 0 16px rgba(43,255,136,0.18)',
-  shGlow: '0 0 22px rgba(43,255,136,0.14)',
-  textGlow: '0 0 6px rgba(43,255,136,0.45)',
+  shCard: 'var(--c-sh-card)',
+  shHover: 'var(--c-sh-hover)',
+  shGlow: 'var(--c-sh-glow)',
+  textGlow: 'var(--c-text-glow)',
 
   // Transitions
   trF: '0.15s ease',

@@ -10,6 +10,14 @@
     <meta name="description" content="Personal weekly task planner" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>Missions</title>
+    <script>
+      // Apply persisted theme before first paint to avoid a flash
+      try {
+        if (localStorage.getItem('missions_light') === 'true') {
+          document.documentElement.setAttribute('data-theme', 'light')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,10 +1,94 @@
 * { box-sizing: border-box; }
 
+/* ════════════════════════════════════════════════════════════
+   Theme palettes. Dark (Pip-Boy CRT) is the default on :root.
+   Light mode (readable under sunlight, same phosphor-green vibe)
+   activates via [data-theme="light"] on <html>.
+   ════════════════════════════════════════════════════════════ */
+:root {
+  /* Surfaces — near-black with a faint green cast */
+  --c-bg-deep: #070b07;
+  --c-bg-surface: #0c120c;
+  --c-bg-surface-alt: #101810;
+  --c-bg-input: #080d08;
+  --c-bg-weekend: #0a0f0a;
+  --c-bg-today: #0c160c;
+
+  /* Borders */
+  --c-border-subtle: #1a2c1a;
+  --c-border-active: #2bff88;
+
+  /* Text — phosphor greens */
+  --c-text-primary: #b8f5c8;
+  --c-text-secondary: #5fa873;
+  --c-text-muted: #3c6b48;
+
+  /* Accent — classic CRT phosphor green */
+  --c-accent: #2bff88;
+  --c-accent-muted: #1aa856;
+  --c-accent-glow: rgba(43, 255, 136, 0.14);
+  --c-accent-dim: rgba(43, 255, 136, 0.06);
+
+  /* Secondary — amber */
+  --c-amber: #ffb340;
+  --c-amber-glow: rgba(255, 179, 64, 0.14);
+
+  /* Shadows / glows */
+  --c-sh-card: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --c-sh-hover: 0 0 16px rgba(43, 255, 136, 0.18);
+  --c-sh-glow: 0 0 22px rgba(43, 255, 136, 0.14);
+  --c-text-glow: 0 0 6px rgba(43, 255, 136, 0.45);
+
+  /* Overlay opacities (CRT scanline + vignette) */
+  --crt-scanline-opacity: 0.5;
+  --crt-vignette-opacity: 1;
+}
+
+:root[data-theme="light"] {
+  /* Surfaces — sun-faded terminal paper, faint green cast */
+  --c-bg-deep: #d6e3ce;
+  --c-bg-surface: #e9f1e3;
+  --c-bg-surface-alt: #dfecd7;
+  --c-bg-input: #f4f9f0;
+  --c-bg-weekend: #d1dfc9;
+  --c-bg-today: #cde8cd;
+
+  /* Borders */
+  --c-border-subtle: #a8c59e;
+  --c-border-active: #0a8f43;
+
+  /* Text — dark forest green, high contrast on light */
+  --c-text-primary: #143420;
+  --c-text-secondary: #2d6740;
+  --c-text-muted: #5a7d62;
+
+  /* Accent — deep phosphor green, readable on light */
+  --c-accent: #0a8f43;
+  --c-accent-muted: #15803d;
+  --c-accent-glow: rgba(10, 143, 67, 0.16);
+  --c-accent-dim: rgba(10, 143, 67, 0.06);
+
+  /* Secondary — darker amber for light bg */
+  --c-amber: #b56908;
+  --c-amber-glow: rgba(181, 105, 8, 0.16);
+
+  /* Shadows / glows — softened for light bg */
+  --c-sh-card: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --c-sh-hover: 0 0 14px rgba(10, 143, 67, 0.20);
+  --c-sh-glow: 0 0 16px rgba(10, 143, 67, 0.16);
+  --c-text-glow: none;
+
+  /* Overlays toned right down for sunlight readability */
+  --crt-scanline-opacity: 0.12;
+  --crt-vignette-opacity: 0.3;
+}
+
 body {
   margin: 0;
   padding: 0;
-  background-color: #070b07;
+  background-color: var(--c-bg-deep);
   overscroll-behavior: none;
+  transition: background-color 0.25s ease;
 }
 
 /* ── Faint CRT scanline overlay ── */
@@ -21,7 +105,7 @@ body::before {
     transparent 1px,
     transparent 3px
   );
-  opacity: 0.5;
+  opacity: var(--crt-scanline-opacity);
   mix-blend-mode: multiply;
 }
 
@@ -33,22 +117,27 @@ body::after {
   pointer-events: none;
   z-index: 9998;
   background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.35) 100%);
+  opacity: var(--crt-vignette-opacity);
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1a2c1a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2bff88; }
+::-webkit-scrollbar-thumb { background: var(--c-border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-accent); }
 
 input, select { color-scheme: dark; }
+:root[data-theme="light"] input,
+:root[data-theme="light"] select { color-scheme: light; }
 input:focus, select:focus {
-  border-color: #2bff88 !important;
-  box-shadow: 0 0 0 2px rgba(43, 255, 136, 0.18) !important;
+  border-color: var(--c-accent) !important;
+  box-shadow: 0 0 0 2px var(--c-accent-glow) !important;
 }
 
 button { transition: background-color 0.15s ease, transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease; }
 button:hover:not(:disabled) { filter: brightness(1.18); }
 button:active:not(:disabled) { transform: scale(0.97); }
+
+:root[data-theme="light"] button:hover:not(:disabled) { filter: brightness(0.95); }
 
 @media (max-width: 768px) {
   input[type="text"],

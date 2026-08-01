@@ -11,6 +11,8 @@ Personal goal-planning system with a Pip-Boy phosphor-terminal aesthetic. PWA in
 
 **Cascade rules:** completing a quest completes all its missions then archives the quest; completing a mission completes its whole subtree (not the parent/quest); deletes cascade through the subtree. All actions are immediate — no confirmations.
 
+**Task assignment** (optional): [`server/`](server/) is a separate NestJS + TypeScript API that lets a user assign a task to a colleague on the same, admin-approved email domain — notified by email whether or not they've used the app. Fully additive; the frontend works identically with or without it deployed. See [`server/README.md`](server/README.md).
+
 ---
 
 ## Local dev setup

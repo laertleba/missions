@@ -9,6 +9,9 @@ import QuestsView from './components/QuestsView'
 import ImportModal from './components/ImportModal'
 import MissionEditModal from './components/MissionEditModal'
 import MissionCreateModal from './components/MissionCreateModal'
+import AssignedToMeView from './components/AssignedToMeView'
+import AssignTaskModal from './components/AssignTaskModal'
+import { getEligibility } from './lib/assignmentsApi'
 
 const CACHE_KEY = 'missions_items_cache'
 
@@ -43,6 +46,9 @@ function Planner({ session }) {
   const [weeklyMode, setWeeklyMode] = useState(() => localStorage.getItem('missions_weekly_mode') || 'week')
   const [createForDate, setCreateForDate] = useState(null) // dateString | null
   const [light, setLight] = useState(() => localStorage.getItem('missions_light') === 'true')
+  const [assignEligible, setAssignEligible] = useState(false)
+  const [assignDomain, setAssignDomain] = useState(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
   const [mob, setMob] = useState(window.innerWidth < 768)
   const [mobDay, setMobDay] = useState(1) // index 1 = today (index 0 = yesterday in new array)
   const [dragItem, setDragItem] = useState(null)
@@ -73,6 +79,15 @@ function Planner({ session }) {
     localStorage.setItem('missions_light', String(light))
     document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark')
   }, [light])
+
+  // ── Assignment feature eligibility (hidden entirely if domain not approved) ──
+  useEffect(() => {
+    getEligibility().then(({ eligible, domain }) => {
+      setAssignEligible(eligible)
+      setAssignDomain(domain)
+      if (!eligible) setView(v => v === 'assigned' ? 'missions' : v)
+    })
+  }, [userId])
 
   // ── Load + realtime ──
   const loadItems = useCallback(async () => {
@@ -516,7 +531,7 @@ function Planner({ session }) {
   // ── Nav tabs ──
   const navTabs = (
     <div style={{ display: 'flex', gap: '4px', backgroundColor: T.bgSurfaceAlt, borderRadius: '4px', padding: '3px', order: mob ? -1 : 0, alignSelf: mob ? 'stretch' : 'auto', border: '1px solid ' + T.borderSubtle }}>
-      {[['missions', 'Missions'], ['quests', 'Quests'], ['week', 'Weekly']].map(([v, label]) => {
+      {[['missions', 'Missions'], ['quests', 'Quests'], ['week', 'Weekly'], ...(assignEligible ? [['assigned', 'Assigned']] : [])].map(([v, label]) => {
         const active = view === v
         return (
           <button key={v} onClick={() => setView(v)} style={{
@@ -558,6 +573,9 @@ function Planner({ session }) {
       <button onClick={exportItems} style={{ ...bBase, padding: '6px 10px', fontSize: '11px' }}>↓ Export</button>
       <button onClick={() => fileRef.current?.click()} style={{ ...bBase, padding: '6px 10px', fontSize: '11px' }}>↑ Import</button>
       <input ref={fileRef} type="file" accept=".json" onChange={handleImportFile} style={{ display: 'none' }} />
+      {assignEligible && (
+        <button onClick={() => setShowAssignModal(true)} style={{ ...bBase, padding: '6px 10px', fontSize: '11px' }}>⇥ Assign Task</button>
+      )}
       <button
         onClick={() => setLight(l => !l)}
         title={light ? 'Switch to dark mode' : 'Switch to light mode (sunlight)'}
@@ -687,9 +705,20 @@ function Planner({ session }) {
             missionHandlers={missionHandlers}
           />
         )}
+
+        {/* ── ASSIGNED TO ME ── */}
+        {view === 'assigned' && assignEligible && (
+          <AssignedToMeView isMobile={mob} />
+        )}
       </div>
 
       {impData && <ImportModal data={impData} onApply={applyImport} onCancel={() => setImpData(null)} />}
+      {showAssignModal && (
+        <AssignTaskModal
+          domain={assignDomain}
+          onClose={() => setShowAssignModal(false)}
+        />
+      )}
       {editingMission && (
         <MissionEditModal
           mission={editingMission}

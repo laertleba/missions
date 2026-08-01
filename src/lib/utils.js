@@ -37,6 +37,7 @@ export function rowToItem(row) {
     createdAt: row.created_at,
     starred: !!row.starred,
     notes: row.notes || '',
+    description: row.description || '',
   }
 }
 

@@ -43,6 +43,9 @@ export default function MissionCreateModal({ dateString, quests, onAdd, onClose 
     >
       <div
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !['TEXTAREA', 'BUTTON', 'SELECT'].includes(e.target.tagName)) { e.preventDefault(); handleSave() }
+        }}
         style={{
           backgroundColor: T.bgSurface,
           border: '1px solid ' + T.accentMuted,
@@ -62,7 +65,7 @@ export default function MissionCreateModal({ dateString, quests, onAdd, onClose 
           autoFocus
           value={title}
           onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose() }}
+          onKeyDown={e => { if (e.key === 'Escape') onClose() }}
           placeholder="Mission name…"
           style={{ ...inp, marginBottom: '14px' }}
         />

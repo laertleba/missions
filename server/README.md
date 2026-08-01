@@ -58,7 +58,7 @@ npm run start:dev      # → http://localhost:3000
 | `CORS_ORIGIN` | Comma-separated list of allowed frontend origins |
 | `PORT` | Defaults to 3000 |
 
-Run the migration (`../migrations/0004_assignments.sql`) in the Supabase SQL editor before starting the server — same process as the other migrations in the main README.
+Run `../migrations/0004_assignments.sql` and `../migrations/0006_assignment_update_request.sql` in the Supabase SQL editor before starting the server — same process as the other migrations in the main README.
 
 ## API
 
@@ -69,7 +69,9 @@ All routes require `Authorization: Bearer <supabase-access-token>`.
 | `GET /me/eligibility` | `{ eligible, domain }` — whether the caller's domain is approved |
 | `POST /assignments` | `{ assigneeEmail, title, description? }` — create + email an assignment (assignee must share the caller's approved domain) |
 | `GET /assignments/mine` | Assignments received by the caller (auto-links any sent before they had an account) |
+| `GET /assignments/sent` | Assignments the caller has sent to others |
 | `PATCH /assignments/:id/status` | `{ status: 'pending' \| 'completed' }` — assignee only |
+| `PATCH /assignments/:id/request-update` | Assigner pings the assignee by email for a status update on a still-pending task — assigner only |
 
 ## Testing
 

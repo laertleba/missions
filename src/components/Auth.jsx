@@ -3,18 +3,33 @@ import { supabase } from '../lib/supabase'
 import { T } from '../lib/theme'
 
 export default function Auth() {
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [info, setInfo] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleLogin(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
+    setInfo(null)
+    if (mode === 'signin') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError(error.message)
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) setError(error.message)
+      else setInfo('Account created — check your email to confirm, then sign in.')
+    }
     setLoading(false)
+  }
+
+  function toggleMode() {
+    setMode(m => m === 'signin' ? 'signup' : 'signin')
+    setError(null)
+    setInfo(null)
   }
 
   const inputStyle = {
@@ -69,10 +84,10 @@ export default function Auth() {
           ▌ Missions
         </h1>
         <p style={{ margin: '0 0 28px 0', fontSize: '13px', color: T.textMuted, fontFamily: T.fontMono }}>
-          Authenticate to access terminal
+          {mode === 'signin' ? 'Authenticate to access terminal' : 'Register a new terminal account'}
         </p>
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: T.textSecondary, marginBottom: '6px' }}>
               Email
@@ -96,7 +111,8 @@ export default function Auth() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              minLength={6}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               style={inputStyle}
             />
           </div>
@@ -117,6 +133,22 @@ export default function Auth() {
             </div>
           )}
 
+          {info && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '10px 12px',
+                backgroundColor: T.accentGlow,
+                border: '1px solid ' + T.accentMuted,
+                borderRadius: T.rSm,
+                fontSize: '13px',
+                color: T.accent,
+              }}
+            >
+              {info}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -134,9 +166,26 @@ export default function Auth() {
               transition: T.trF,
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? (mode === 'signin' ? 'Signing in…' : 'Creating account…') : (mode === 'signin' ? 'Sign in' : 'Sign up')}
           </button>
         </form>
+
+        <button
+          onClick={toggleMode}
+          style={{
+            marginTop: '18px',
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            color: T.textMuted,
+            fontSize: '12px',
+            fontFamily: T.fontMono,
+            cursor: 'pointer',
+            textAlign: 'center',
+          }}
+        >
+          {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+        </button>
       </div>
     </div>
   )

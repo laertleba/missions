@@ -65,6 +65,9 @@ export default function MissionEditModal({ mission, onSave, onClose, quests = []
     >
       <div
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !['TEXTAREA', 'BUTTON', 'SELECT'].includes(e.target.tagName)) { e.preventDefault(); handleSave() }
+        }}
         style={{
           backgroundColor: T.bgSurface,
           border: '1px solid ' + T.accentMuted,

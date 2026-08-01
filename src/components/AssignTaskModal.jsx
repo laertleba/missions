@@ -12,7 +12,7 @@ export default function AssignTaskModal({ domain, onClose, onSent }) {
   async function handleSend() {
     const assigneeEmail = email.trim()
     const t = title.trim()
-    if (!assigneeEmail || !t) return
+    if (!assigneeEmail || !t || sending) return
     setSending(true)
     setError('')
     try {
@@ -54,6 +54,9 @@ export default function AssignTaskModal({ domain, onClose, onSent }) {
     >
       <div
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !['TEXTAREA', 'BUTTON', 'SELECT'].includes(e.target.tagName)) { e.preventDefault(); handleSend() }
+        }}
         style={{
           backgroundColor: T.bgSurface,
           border: '1px solid ' + T.accentMuted,

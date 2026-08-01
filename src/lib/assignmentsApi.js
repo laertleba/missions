@@ -52,3 +52,15 @@ export async function updateAssignmentStatus(id, status) {
     body: JSON.stringify({ status }),
   })
 }
+
+export async function getSentAssignments() {
+  try {
+    return (await authedFetch('/assignments/sent')) || []
+  } catch {
+    return []
+  }
+}
+
+export async function requestAssignmentUpdate(id) {
+  return authedFetch(`/assignments/${id}/request-update`, { method: 'PATCH' })
+}

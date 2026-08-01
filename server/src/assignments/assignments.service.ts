@@ -16,6 +16,7 @@ export interface AssignmentRow {
   status: 'pending' | 'completed'
   created_at: string
   email_sent_at: string | null
+  update_requested_at: string | null
 }
 
 @Injectable()
@@ -113,6 +114,47 @@ export class AssignmentsService {
       .select()
       .single()
     if (error || !data) throw error ?? new Error('Failed to update assignment')
+    return data as AssignmentRow
+  }
+
+  // Assignments the caller has sent to others.
+  async findSent(user: AuthenticatedUser): Promise<AssignmentRow[]> {
+    const { data, error } = await this.supabase.client
+      .from('assignments')
+      .select()
+      .eq('assigner_id', user.id)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as AssignmentRow[]
+  }
+
+  // Assigner pings the assignee for a status update on a still-pending
+  // task. Assigner-only — mirrors the assignee-only guard on updateStatus.
+  async requestUpdate(user: AuthenticatedUser, id: string): Promise<AssignmentRow> {
+    const { data: existing, error: fetchError } = await this.supabase.client
+      .from('assignments')
+      .select()
+      .eq('id', id)
+      .maybeSingle()
+    if (fetchError) throw fetchError
+    if (!existing) throw new NotFoundException('Assignment not found')
+    if (existing.assigner_id !== user.id) {
+      throw new ForbiddenException('Only the assigner can request an update')
+    }
+
+    await this.email.sendUpdateRequest({
+      toEmail: existing.assignee_email,
+      title: existing.title,
+      assignerEmail: existing.assigner_email,
+    })
+
+    const { data, error } = await this.supabase.client
+      .from('assignments')
+      .update({ update_requested_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error || !data) throw error ?? new Error('Failed to record update request')
     return data as AssignmentRow
   }
 }

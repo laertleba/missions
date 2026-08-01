@@ -54,12 +54,8 @@ function DayMissionNode({ mission, questLabel, parentLabel, childrenByParent, co
   const kidsRaw = childrenByParent[mission.id] || []
   const incompleteKids = kidsRaw.filter(k => !k.completed)
   const completedKids = kidsRaw.filter(k => k.completed)
-  const collapseCompleted = completedKids.length > 3 && !showCompleted
-  const kids = collapseCompleted
-    ? incompleteKids
-    : deprioritizeCompleted
-      ? [...incompleteKids, ...completedKids]
-      : kidsRaw
+  const needsCollapseUI = completedKids.length > 3
+  const collapseCompleted = needsCollapseUI && !showCompleted
   const hasKids = kidsRaw.length > 0
   const isOpen = !collapsed.has(mission.id)
   const done = mission.completed
@@ -214,18 +210,24 @@ function DayMissionNode({ mission, questLabel, parentLabel, childrenByParent, co
         <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows ' + T.trM }}>
           <div style={{ overflow: 'hidden' }}>
             <div style={{ marginLeft: isMobile ? '10px' : '12px', paddingLeft: isMobile ? '8px' : '10px', borderLeft: '1px solid ' + T.borderSubtle, marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {kids.map(child => (
-                <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
-              ))}
-              {collapseCompleted && (
-                <button onClick={() => setShowCompleted(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
-                  ▸ {completedKids.length} completed
-                </button>
-              )}
-              {!collapseCompleted && completedKids.length > 3 && (
-                <button onClick={() => setShowCompleted(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
-                  ▾ Hide completed
-                </button>
+              {needsCollapseUI || deprioritizeCompleted ? (
+                <>
+                  {incompleteKids.map(child => (
+                    <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
+                  ))}
+                  {needsCollapseUI && (
+                    <button onClick={() => setShowCompleted(s => !s)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+                      {collapseCompleted ? `▸ ${completedKids.length} completed` : '▾ Hide completed'}
+                    </button>
+                  )}
+                  {!collapseCompleted && completedKids.map(child => (
+                    <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
+                  ))}
+                </>
+              ) : (
+                kidsRaw.map(child => (
+                  <DayMissionNode key={child.id} mission={child} childrenByParent={childrenByParent} collapsed={collapsed} onToggleCollapse={onToggleCollapse} depth={depth + 1} handlers={handlers} isMobile={isMobile} deprioritizeCompleted={deprioritizeCompleted} />
+                ))
               )}
             </div>
           </div>
@@ -245,12 +247,9 @@ export default function DayMissionTree({ topLevel, childrenByParent, handlers, i
 
   const incompleteTop = topLevel.filter(m => !m.completed)
   const completedTop = topLevel.filter(m => m.completed)
-  const collapseTop = completedTop.length > 3 && !showCompletedTop
-  const visibleTop = collapseTop
-    ? incompleteTop
-    : deprioritizeCompleted
-      ? [...incompleteTop, ...completedTop]
-      : topLevel
+  const needsCollapseTopUI = completedTop.length > 3
+  const collapseTop = needsCollapseTopUI && !showCompletedTop
+  const useSplitOrder = needsCollapseTopUI || deprioritizeCompleted
 
   if (topLevel.length === 0) {
     return (
@@ -260,32 +259,36 @@ export default function DayMissionTree({ topLevel, childrenByParent, handlers, i
     )
   }
 
+  const node = m => (
+    <DayMissionNode
+      key={m.id}
+      mission={m}
+      questLabel={questLabels ? questLabels.get(m.id) : undefined}
+      parentLabel={parentLabels ? parentLabels.get(m.id) : undefined}
+      childrenByParent={childrenByParent}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+      depth={0}
+      handlers={handlers}
+      isMobile={isMobile}
+      deprioritizeCompleted={deprioritizeCompleted}
+    />
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {visibleTop.map(m => (
-        <DayMissionNode
-          key={m.id}
-          mission={m}
-          questLabel={questLabels ? questLabels.get(m.id) : undefined}
-          parentLabel={parentLabels ? parentLabels.get(m.id) : undefined}
-          childrenByParent={childrenByParent}
-          collapsed={collapsed}
-          onToggleCollapse={onToggleCollapse}
-          depth={0}
-          handlers={handlers}
-          isMobile={isMobile}
-          deprioritizeCompleted={deprioritizeCompleted}
-        />
-      ))}
-      {collapseTop && (
-        <button onClick={() => setShowCompletedTop(true)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
-          ▸ {completedTop.length} completed
-        </button>
-      )}
-      {!collapseTop && completedTop.length > 3 && (
-        <button onClick={() => setShowCompletedTop(false)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
-          ▾ Hide completed
-        </button>
+      {useSplitOrder ? (
+        <>
+          {incompleteTop.map(node)}
+          {needsCollapseTopUI && (
+            <button onClick={() => setShowCompletedTop(s => !s)} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid ' + T.borderSubtle, borderRadius: '4px', color: T.textMuted, cursor: 'pointer', fontSize: '10px', fontFamily: T.fontMono, padding: '3px 8px', letterSpacing: '0.05em' }}>
+              {collapseTop ? `▸ ${completedTop.length} completed` : '▾ Hide completed'}
+            </button>
+          )}
+          {!collapseTop && completedTop.map(node)}
+        </>
+      ) : (
+        topLevel.map(node)
       )}
     </div>
   )

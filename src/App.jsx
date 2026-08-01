@@ -228,6 +228,11 @@ function Planner({ session }) {
     await runWrite(supabase.from('items').update({ title }).eq('id', id))
   }
 
+  async function updateQuestDescription(id, description) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, description } : it))
+    await runWrite(supabase.from('items').update({ description }).eq('id', id))
+  }
+
   async function toggleStar(item) {
     const newStarred = !item.starred
     setItems(prev => prev.map(it => it.id === item.id ? { ...it, starred: newStarred } : it))
@@ -246,11 +251,6 @@ function Planner({ session }) {
     const m = mkMission({ id: crypto.randomUUID(), title, questId: quest.id, parentId: quest.id, scheduledDate, sortOrder: nextSiblingSort(quest.id) })
     setItems(prev => [...prev, m])
     await runWrite(supabase.from('items').insert(missionInsert(m)))
-  }
-
-  async function addTopMissionById(questId, title, scheduledDate) {
-    const quest = quests.find(q => q.id === questId)
-    if (quest) await addTopMission(quest, title, scheduledDate)
   }
 
   async function addMissionForDate(questId, title, scheduledDate, notes) {
@@ -682,7 +682,7 @@ function Planner({ session }) {
             childrenByParent={childrenByParent}
             isMobile={mob}
             missionHandlers={missionHandlers}
-            onAddMission={addTopMissionById}
+            onAddMission={addMissionForDate}
           />
         )}
 
@@ -702,6 +702,7 @@ function Planner({ session }) {
             onDeleteQuest={deleteItem}
             onAddTopMission={addTopMission}
             onRenameQuest={renameItem}
+            onUpdateQuestDescription={updateQuestDescription}
             missionHandlers={missionHandlers}
           />
         )}

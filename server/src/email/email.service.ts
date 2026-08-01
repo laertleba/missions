@@ -9,6 +9,12 @@ export interface AssignmentEmailInput {
   assignerEmail: string
 }
 
+export interface UpdateRequestEmailInput {
+  toEmail: string
+  title: string
+  assignerEmail: string
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name)
@@ -33,6 +39,20 @@ export class EmailService {
       throw new Error(error.message)
     }
   }
+
+  async sendUpdateRequest(input: UpdateRequestEmailInput): Promise<void> {
+    const html = renderUpdateRequestEmail(input)
+    const { error } = await this.resend.emails.send({
+      from: this.fromEmail,
+      to: input.toEmail,
+      subject: `${input.assignerEmail} is requesting an update: ${input.title}`,
+      html,
+    })
+    if (error) {
+      this.logger.error(`Failed to send update-request email to ${input.toEmail}: ${error.message}`)
+      throw new Error(error.message)
+    }
+  }
 }
 
 // Minimal on-brand (Pip-Boy phosphor-green) HTML email. Kept inline —
@@ -53,6 +73,27 @@ function renderAssignmentEmail({ title, description, assignerEmail }: Assignment
           Assigned by ${safeAssigner}
         </div>
         <a href="https://missions.laertleba.com" style="display:inline-block;margin-top:18px;background:#2bff88;color:#06140b;text-decoration:none;font-size:12px;font-weight:700;padding:10px 18px;border-radius:4px;">
+          Open Missions
+        </a>
+      </div>
+    </div>
+  `.trim()
+}
+
+function renderUpdateRequestEmail({ title, assignerEmail }: UpdateRequestEmailInput): string {
+  const safeTitle = escapeHtml(title)
+  const safeAssigner = escapeHtml(assignerEmail)
+  return `
+    <div style="background:#070b07;padding:32px;font-family:ui-monospace,Consolas,monospace;">
+      <div style="max-width:480px;margin:0 auto;background:#0c120c;border:1px solid #1a2c1a;border-radius:8px;padding:24px;">
+        <div style="color:#ffb340;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:16px;">
+          ▌ Status Update Requested
+        </div>
+        <div style="color:#b8f5c8;font-size:18px;font-weight:700;margin-bottom:8px;">${safeTitle}</div>
+        <div style="color:#5fa873;font-size:13px;line-height:1.6;margin-bottom:20px;">
+          ${safeAssigner} would like an update on this task.
+        </div>
+        <a href="https://missions.laertleba.com" style="display:inline-block;margin-top:6px;background:#2bff88;color:#06140b;text-decoration:none;font-size:12px;font-weight:700;padding:10px 18px;border-radius:4px;">
           Open Missions
         </a>
       </div>

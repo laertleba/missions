@@ -104,4 +104,49 @@ describe('AssignmentsService', () => {
 
     await expect(svc.updateStatus(assigner, 'missing', 'completed')).rejects.toThrow(NotFoundException)
   })
+
+  it('rejects an update request from a user who is not the assigner', async () => {
+    const domains = { isApproved: jest.fn() }
+    const email = { sendUpdateRequest: jest.fn() }
+    const existing = { id: 'a1', assigner_id: 'someone-else', assignee_email: 'bob@approved.com' }
+    const supabase = makeSupabaseMock([{ data: existing, error: null }])
+    const svc = new AssignmentsService(supabase as any, domains as any, email as any)
+
+    await expect(svc.requestUpdate(assigner, 'a1')).rejects.toThrow(ForbiddenException)
+    expect(email.sendUpdateRequest).not.toHaveBeenCalled()
+  })
+
+  it('throws NotFoundException when requesting an update on a nonexistent assignment', async () => {
+    const domains = { isApproved: jest.fn() }
+    const email = { sendUpdateRequest: jest.fn() }
+    const supabase = makeSupabaseMock([{ data: null, error: null }])
+    const svc = new AssignmentsService(supabase as any, domains as any, email as any)
+
+    await expect(svc.requestUpdate(assigner, 'missing')).rejects.toThrow(NotFoundException)
+  })
+
+  it('sends an update-request email and records the timestamp when the caller is the assigner', async () => {
+    const domains = { isApproved: jest.fn() }
+    const email = { sendUpdateRequest: jest.fn().mockResolvedValue(undefined) }
+    const existing = {
+      id: 'a1',
+      assigner_id: assigner.id,
+      assigner_email: assigner.email,
+      assignee_email: 'bob@approved.com',
+      title: 'Task',
+    }
+    const updated = { ...existing, update_requested_at: new Date().toISOString() }
+    const supabase = makeSupabaseMock([
+      { data: existing, error: null }, // select().maybeSingle()
+      { data: updated, error: null }, // update().select().single()
+    ])
+    const svc = new AssignmentsService(supabase as any, domains as any, email as any)
+
+    const result = await svc.requestUpdate(assigner, 'a1')
+
+    expect(email.sendUpdateRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ toEmail: 'bob@approved.com', title: 'Task', assignerEmail: assigner.email }),
+    )
+    expect(result.update_requested_at).toBeTruthy()
+  })
 })

@@ -6,7 +6,7 @@ export default function QuestsView({
   quests, childrenByParent, selectedQuestId, onSelectQuest,
   questFilter, setQuestFilter, isMobile,
   onAddQuest, onCompleteQuest, onReactivateQuest, onDeleteQuest,
-  onAddTopMission, onRenameQuest, missionHandlers,
+  onAddTopMission, onRenameQuest, onUpdateQuestDescription, missionHandlers,
 }) {
   const [questDraft, setQuestDraft] = useState('')
   const [missionDraft, setMissionDraft] = useState('')
@@ -14,6 +14,9 @@ export default function QuestsView({
   // Inline quest rename state
   const [editingTitle, setEditingTitle] = useState(null) // null | string
   const titleInputRef = useRef(null)
+  // Inline quest description state
+  const [editingDescription, setEditingDescription] = useState(null) // null | string
+  const descriptionInputRef = useRef(null)
 
   const visibleQuests = quests.filter(q => (questFilter === 'archived' ? q.archived : !q.archived))
   // Only treat a quest as selected if it belongs to the current filter tab
@@ -24,6 +27,17 @@ export default function QuestsView({
   useEffect(() => {
     if (editingTitle !== null) titleInputRef.current?.focus()
   }, [editingTitle !== null]) // eslint-disable-line
+
+  // Focus description input when editing starts
+  useEffect(() => {
+    if (editingDescription !== null) descriptionInputRef.current?.focus()
+  }, [editingDescription !== null]) // eslint-disable-line
+
+  // Discard any open rename/description edit when switching quests
+  useEffect(() => {
+    setEditingTitle(null)
+    setEditingDescription(null)
+  }, [selectedQuestId])
 
   function submitQuest() {
     const t = questDraft.trim(); if (!t) return
@@ -39,6 +53,12 @@ export default function QuestsView({
       onRenameQuest(selected.id, editingTitle.trim())
     }
     setEditingTitle(null)
+  }
+  function commitDescription() {
+    if (editingDescription !== null && selected) {
+      onUpdateQuestDescription(selected.id, editingDescription.trim())
+    }
+    setEditingDescription(null)
   }
 
   const fs = { // responsive font sizes
@@ -212,6 +232,53 @@ export default function QuestsView({
                 </>
               )}
             </div>
+          </div>
+
+          {/* Optional quest description */}
+          <div style={{ marginBottom: '16px' }}>
+            {editingDescription !== null ? (
+              <textarea
+                ref={descriptionInputRef}
+                value={editingDescription}
+                onChange={e => setEditingDescription(e.target.value)}
+                onBlur={commitDescription}
+                onKeyDown={e => { if (e.key === 'Escape') setEditingDescription(null) }}
+                placeholder="Optional quest description…"
+                rows={2}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  backgroundColor: T.bgInput,
+                  border: '1px solid ' + T.accentMuted,
+                  borderRadius: '4px',
+                  padding: '8px 10px',
+                  color: T.textPrimary,
+                  fontSize: fs.questItem,
+                  fontFamily: T.fontMono,
+                  outline: 'none',
+                  lineHeight: '1.5',
+                  resize: 'vertical',
+                }}
+              />
+            ) : selected.description ? (
+              <div
+                onClick={() => !selected.archived && setEditingDescription(selected.description)}
+                title={selected.archived ? undefined : 'Click to edit'}
+                style={{
+                  fontSize: fs.questItem, color: T.textSecondary, fontFamily: T.fontMono,
+                  lineHeight: '1.5', whiteSpace: 'pre-wrap', cursor: selected.archived ? 'default' : 'pointer',
+                }}
+              >
+                {selected.description}
+              </div>
+            ) : !selected.archived && (
+              <button
+                onClick={() => setEditingDescription('')}
+                style={{
+                  background: 'transparent', border: 'none', color: T.textMuted, cursor: 'pointer',
+                  fontSize: fs.meta, fontFamily: T.fontMono, padding: 0, letterSpacing: '0.04em',
+                }}
+              >+ Add description</button>
+            )}
           </div>
 
           {/* Add top-level mission */}

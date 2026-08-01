@@ -21,6 +21,11 @@ export class AssignmentsController {
     return this.assignments.findMine(user)
   }
 
+  @Get('sent')
+  findSent(@CurrentUser() user: AuthenticatedUser) {
+    return this.assignments.findSent(user)
+  }
+
   @Patch(':id/status')
   updateStatus(
     @CurrentUser() user: AuthenticatedUser,
@@ -28,5 +33,10 @@ export class AssignmentsController {
     @Body() dto: UpdateAssignmentStatusDto,
   ) {
     return this.assignments.updateStatus(user, id, dto.status)
+  }
+
+  @Patch(':id/request-update')
+  requestUpdate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.assignments.requestUpdate(user, id)
   }
 }

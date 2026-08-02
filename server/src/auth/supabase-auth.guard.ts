@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { Request } from 'express'
 import { SupabaseService } from '../supabase/supabase.service'
 import { AuthenticatedUser } from './types'
@@ -9,6 +9,8 @@ import { AuthenticatedUser } from './types'
 // handlers (see CurrentUser decorator).
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
+  private readonly logger = new Logger(SupabaseAuthGuard.name)
+
   constructor(private readonly supabase: SupabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -19,6 +21,9 @@ export class SupabaseAuthGuard implements CanActivate {
 
     const { data, error } = await this.supabase.client.auth.getUser(token)
     if (error || !data.user || !data.user.email) {
+      // Client sees a generic message (don't leak internals); server
+      // logs the real Supabase error so it's actually diagnosable.
+      this.logger.warn(`Token validation failed: ${error?.message ?? 'no user/email on response'}`)
       throw new UnauthorizedException('Invalid or expired session')
     }
 
